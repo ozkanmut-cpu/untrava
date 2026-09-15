@@ -30,4 +30,31 @@ describe('identity HTTP routes', () => {
     expect(response.statusCode).toBe(400);
     await app.close();
   });
+
+  it('revokes a device session idempotently', async () => {
+    const app = await buildApp();
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/identity/anonymous',
+      payload: { deviceId },
+    });
+    const { userId, sessionId } = created.json();
+
+    const first = await app.inject({
+      method: 'DELETE',
+      url: `/v1/device-sessions/${sessionId}`,
+      headers: { 'x-untrava-user-id': userId },
+    });
+    const second = await app.inject({
+      method: 'DELETE',
+      url: `/v1/device-sessions/${sessionId}`,
+      headers: { 'x-untrava-user-id': userId },
+    });
+
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toEqual({ revoked: true });
+    expect(second.statusCode).toBe(200);
+    expect(second.json()).toEqual({ revoked: true });
+    await app.close();
+  });
 });
