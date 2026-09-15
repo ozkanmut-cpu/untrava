@@ -29,6 +29,8 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter @untrava/api prisma generate
       - name: Lint
         run: pnpm lint
       - name: Typecheck
