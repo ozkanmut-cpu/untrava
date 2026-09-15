@@ -1,12 +1,25 @@
 import type { PrismaClient } from '@prisma/client';
-import type { ConsentCategory } from '@untrava/contracts';
+import { ConsentActionSchema, ConsentCategorySchema, type ConsentCategory } from '@untrava/contracts';
+import { z } from 'zod';
 import type { ConsentLedgerEntry, ConsentRecordInput, ConsentRepository } from './consent.service';
+
+const PersistedConsentSchema = z.object({
+  id: z.uuid(),
+  userId: z.uuid(),
+  recipientId: z.uuid().nullable(),
+  category: ConsentCategorySchema,
+  purpose: z.string().min(1),
+  action: ConsentActionSchema,
+  version: z.number().int().positive(),
+  recordedAt: z.date(),
+});
 
 export class PrismaConsentRepository implements ConsentRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async append(input: ConsentRecordInput): Promise<ConsentLedgerEntry> {
-    return this.prisma.consentLedgerEntry.create({ data: input });
+    const row = await this.prisma.consentLedgerEntry.create({ data: input });
+    return PersistedConsentSchema.parse(row);
   }
 
   async findLatest(
@@ -14,9 +27,10 @@ export class PrismaConsentRepository implements ConsentRepository {
     category: ConsentCategory,
     recipientId?: string | null,
   ): Promise<ConsentLedgerEntry | null> {
-    return this.prisma.consentLedgerEntry.findFirst({
+    const row = await this.prisma.consentLedgerEntry.findFirst({
       where: { userId, category, recipientId: recipientId ?? null },
       orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
     });
+    return row ? PersistedConsentSchema.parse(row) : null;
   }
 }
