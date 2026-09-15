@@ -6,8 +6,5 @@
     "lint": "eslint src test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
-  },
-  "dependencies": {
-    "@untrava/contracts": "workspace:*"
   }
 }

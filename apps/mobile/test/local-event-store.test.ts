@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { QuitEventEnvelope } from '@untrava/contracts';
+import type { QuitEventEnvelope } from '../../../packages/contracts/src/index';
 import { LocalEventStore, type LocalEventDatabase } from '../src/local-event-store';
 
 const event: QuitEventEnvelope = {
@@ -15,7 +15,7 @@ const event: QuitEventEnvelope = {
 
 class MemoryDatabase implements LocalEventDatabase {
   rows = new Map<string, { envelope: string; syncState: 'pending' | 'synced' | 'failed'; attemptCount: number; nextAttemptAt: string | null; syncedAt: string | null }>();
-  async get(eventId: string) { return this.rows.get(eventId) ?? null; }
+  async get(eventId: string) { const row = this.rows.get(eventId); return row ? { eventId, ...row } : null; }
   async insert(eventId: string, envelope: string) {
     this.rows.set(eventId, { envelope, syncState: 'pending', attemptCount: 0, nextAttemptAt: null, syncedAt: null });
   }
