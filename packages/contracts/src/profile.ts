@@ -19,6 +19,9 @@ export const QuitProfileSchema = z.object({
   userId: UserIdSchema,
   strategy: QuitStrategySchema,
   products: z.array(ProductBaselineSchema).min(1),
+  quitDate: z.iso.datetime().nullable().optional(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export const GoalSchema = z.object({
@@ -27,6 +30,7 @@ export const GoalSchema = z.object({
   type: GoalTypeSchema,
   startsAt: z.iso.datetime(),
   endsAt: z.iso.datetime().nullable(),
+  reductionTarget: ProductBaselineSchema.optional(),
 });
 
 export type ProductType = z.infer<typeof ProductTypeSchema>;
