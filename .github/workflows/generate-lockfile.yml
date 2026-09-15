@@ -1,0 +1,32 @@
+name: Generate lockfile
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/generate-lockfile.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Generate lockfile
+        run: pnpm install --lockfile-only --no-frozen-lockfile
+      - name: Upload lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: pnpm-lock
+          path: pnpm-lock.yaml
+          if-no-files-found: error
