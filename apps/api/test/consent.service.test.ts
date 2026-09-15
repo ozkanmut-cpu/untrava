@@ -1,25 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { ConsentService, type ConsentRepository } from '../src/modules/consent/consent.service';
-
-type Entry = {
-  id: string;
-  userId: string;
-  recipientId?: string | null;
-  category: string;
-  purpose: string;
-  action: 'grant' | 'revoke';
-  version: number;
-  recordedAt: Date;
-};
+import {
+  ConsentService,
+  type ConsentLedgerEntry,
+  type ConsentRepository,
+} from '../src/modules/consent/consent.service';
 
 function memoryRepository(): ConsentRepository {
-  const entries: Entry[] = [];
+  const entries: ConsentLedgerEntry[] = [];
   let sequence = 0;
 
   return {
     async append(input) {
       sequence += 1;
-      const entry = {
+      const entry: ConsentLedgerEntry = {
         ...input,
         id: `750e8400-e29b-41d4-a716-${String(sequence).padStart(12, '0')}`,
         recordedAt: new Date(sequence * 1000),
