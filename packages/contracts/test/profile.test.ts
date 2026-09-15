@@ -39,7 +39,7 @@ describe('foundation profile contracts', () => {
     ]);
   });
 
-  it('validates a product-specific quit profile', () => {
+  it('validates a complete product-specific quit profile', () => {
     expect(
       QuitProfileSchema.parse({
         userId: id,
@@ -48,19 +48,23 @@ describe('foundation profile contracts', () => {
           { product: 'cigarette', dailyQuantity: 12 },
           { product: 'vape', dailyQuantity: 3 },
         ],
+        quitDate: '2026-10-01T00:00:00.000Z',
+        createdAt: '2026-09-15T00:00:00.000Z',
+        updatedAt: '2026-09-15T00:00:00.000Z',
       }),
     ).toMatchObject({ userId: id, strategy: 'gradual_reduction' });
   });
 
-  it('validates time-bounded goals without deleting history', () => {
+  it('validates time-bounded reduction goals with optional target metadata', () => {
     expect(
       GoalSchema.parse({
         goalId: id,
         userId: id,
-        type: 'smoke_free',
+        type: 'reduction',
         startsAt: '2026-09-15T00:00:00.000Z',
         endsAt: null,
+        reductionTarget: { product: 'cigarette', dailyQuantity: 5 },
       }),
-    ).toMatchObject({ type: 'smoke_free', endsAt: null });
+    ).toMatchObject({ type: 'reduction', endsAt: null });
   });
 });
