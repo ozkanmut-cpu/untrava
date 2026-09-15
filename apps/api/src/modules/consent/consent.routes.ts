@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ConsentActionSchema, ConsentCategorySchema } from '@untrava/contracts';
-import { ConsentService, type ConsentRepository } from './consent.service';
+import { ConsentService, type ConsentRecordInput, type ConsentRepository } from './consent.service';
 
 const UserHeaderSchema = z.uuid();
 const ConsentBodySchema = z.object({
@@ -28,7 +28,15 @@ export async function registerConsentRoutes(
     const body = ConsentBodySchema.safeParse(request.body);
     if (!userId.success || !body.success) return reply.code(400).send({ error: 'invalid_request' });
 
-    const entry = await service.record({ userId: userId.data, ...body.data });
+    const input: ConsentRecordInput = {
+      userId: userId.data,
+      category: body.data.category,
+      purpose: body.data.purpose,
+      action: body.data.action,
+      version: body.data.version,
+      ...(body.data.recipientId !== undefined ? { recipientId: body.data.recipientId } : {}),
+    };
+    const entry = await service.record(input);
     return reply.code(201).send(entry);
   });
 
