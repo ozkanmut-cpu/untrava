@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { registerIdentityRoutes } from './modules/identity/routes';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -18,6 +19,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   app.get('/health', async () => ({ status: 'ok' as const }));
+  await registerIdentityRoutes(app);
 
   return app;
 }
