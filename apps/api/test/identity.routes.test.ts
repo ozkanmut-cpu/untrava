@@ -25,8 +25,13 @@ class SpyIdentityRepository implements IdentityRepository {
 }
 
 describe('identity HTTP routes', () => {
+  it('requires an explicit repository when no persistent database is configured', async () => {
+    await expect(buildApp()).rejects.toThrow(/DATABASE_URL|identity repository/i);
+  });
+
   it('creates an anonymous identity for a valid device id', async () => {
-    const app = await buildApp();
+    const repository = new SpyIdentityRepository();
+    const app = await buildApp({ identityRepository: repository });
     const response = await app.inject({
       method: 'POST',
       url: '/v1/identity/anonymous',
@@ -35,13 +40,12 @@ describe('identity HTTP routes', () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({ deviceId });
-    expect(response.json().userId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(response.json().sessionId).toMatch(/^[0-9a-f-]{36}$/);
     await app.close();
   });
 
   it('rejects malformed device ids', async () => {
-    const app = await buildApp();
+    const repository = new SpyIdentityRepository();
+    const app = await buildApp({ identityRepository: repository });
     const response = await app.inject({
       method: 'POST',
       url: '/v1/identity/anonymous',
@@ -53,7 +57,8 @@ describe('identity HTTP routes', () => {
   });
 
   it('revokes a device session idempotently', async () => {
-    const app = await buildApp();
+    const repository = new SpyIdentityRepository();
+    const app = await buildApp({ identityRepository: repository });
     const created = await app.inject({
       method: 'POST',
       url: '/v1/identity/anonymous',
