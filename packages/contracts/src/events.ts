@@ -63,8 +63,12 @@ const RetractionEventSchema = EventBaseSchema.extend({
     .catchall(z.unknown()),
 });
 
-const genericEvent = (eventType: Exclude<z.infer<typeof QuitEventTypeSchema>,
-  'product_use' | 'treatment_adherence' | 'correction' | 'retraction'>) =>
+const genericEvent = (
+  eventType: Exclude<
+    z.infer<typeof QuitEventTypeSchema>,
+    'product_use' | 'treatment_adherence' | 'correction' | 'retraction'
+  >,
+) =>
   EventBaseSchema.extend({
     eventType: z.literal(eventType),
     payload: GenericPayloadSchema,
@@ -86,18 +90,21 @@ export const QuitEventEnvelopeSchema = z.discriminatedUnion('eventType', [
   RetractionEventSchema,
 ]);
 
+export const EventIngestResultSchema = z.object({
+  eventId: EventIdSchema,
+  status: z.enum(['accepted', 'duplicate']),
+});
+
+export const SyncBatchRequestSchema = z.object({
+  events: z.array(QuitEventEnvelopeSchema),
+});
+
+export const SyncBatchResponseSchema = z.object({
+  results: z.array(EventIngestResultSchema),
+});
+
 export type QuitEventType = z.infer<typeof QuitEventTypeSchema>;
 export type QuitEventEnvelope = z.infer<typeof QuitEventEnvelopeSchema>;
-
-export interface EventIngestResult {
-  eventId: string;
-  status: 'accepted' | 'duplicate';
-}
-
-export interface SyncBatchRequest {
-  events: QuitEventEnvelope[];
-}
-
-export interface SyncBatchResponse {
-  results: EventIngestResult[];
-}
+export type EventIngestResult = z.infer<typeof EventIngestResultSchema>;
+export type SyncBatchRequest = z.infer<typeof SyncBatchRequestSchema>;
+export type SyncBatchResponse = z.infer<typeof SyncBatchResponseSchema>;
