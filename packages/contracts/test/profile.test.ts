@@ -39,32 +39,42 @@ describe('foundation profile contracts', () => {
     ]);
   });
 
-  it('validates a complete product-specific quit profile', () => {
-    expect(
-      QuitProfileSchema.parse({
-        userId: id,
-        strategy: 'gradual_reduction',
-        products: [
-          { product: 'cigarette', dailyQuantity: 12 },
-          { product: 'vape', dailyQuantity: 3 },
-        ],
-        quitDate: '2026-10-01T00:00:00.000Z',
-        createdAt: '2026-09-15T00:00:00.000Z',
-        updatedAt: '2026-09-15T00:00:00.000Z',
-      }),
-    ).toMatchObject({ userId: id, strategy: 'gradual_reduction' });
+  it('preserves complete product-specific quit profile metadata', () => {
+    const parsed = QuitProfileSchema.parse({
+      userId: id,
+      strategy: 'gradual_reduction',
+      products: [
+        { product: 'cigarette', dailyQuantity: 12 },
+        { product: 'vape', dailyQuantity: 3 },
+      ],
+      quitDate: '2026-10-01T00:00:00.000Z',
+      createdAt: '2026-09-15T00:00:00.000Z',
+      updatedAt: '2026-09-15T00:00:00.000Z',
+    });
+
+    expect(parsed).toMatchObject({
+      userId: id,
+      strategy: 'gradual_reduction',
+      quitDate: '2026-10-01T00:00:00.000Z',
+      createdAt: '2026-09-15T00:00:00.000Z',
+      updatedAt: '2026-09-15T00:00:00.000Z',
+    });
   });
 
-  it('validates time-bounded reduction goals with optional target metadata', () => {
-    expect(
-      GoalSchema.parse({
-        goalId: id,
-        userId: id,
-        type: 'reduction',
-        startsAt: '2026-09-15T00:00:00.000Z',
-        endsAt: null,
-        reductionTarget: { product: 'cigarette', dailyQuantity: 5 },
-      }),
-    ).toMatchObject({ type: 'reduction', endsAt: null });
+  it('preserves reduction target metadata on time-bounded goals', () => {
+    const parsed = GoalSchema.parse({
+      goalId: id,
+      userId: id,
+      type: 'reduction',
+      startsAt: '2026-09-15T00:00:00.000Z',
+      endsAt: null,
+      reductionTarget: { product: 'cigarette', dailyQuantity: 5 },
+    });
+
+    expect(parsed).toMatchObject({
+      type: 'reduction',
+      endsAt: null,
+      reductionTarget: { product: 'cigarette', dailyQuantity: 5 },
+    });
   });
 });
