@@ -53,4 +53,18 @@ describe('EventService', () => {
       service.ingestBatch('650e8400-e29b-41d4-a716-446655440001', [event]),
     ).rejects.toThrow('event user does not match authenticated user');
   });
+
+  it('rejects a correction whose target does not exist', async () => {
+    const service = new EventService(memoryRepository());
+    const correction: QuitEventEnvelope = {
+      ...event,
+      eventId: '550e8400-e29b-41d4-a716-446655440004',
+      eventType: 'correction',
+      payload: { targetEventId: eventId, replacement: { quantity: 2 } },
+    };
+
+    await expect(service.ingestBatch(userId, [correction])).rejects.toThrow(
+      'correction target does not exist',
+    );
+  });
 });
