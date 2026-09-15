@@ -10,7 +10,7 @@ describe('PrismaConsentRepository', () => {
       consentLedgerEntry: {
         async create(args: { data: Record<string, unknown> }) {
           calls.push(args.data);
-          return { id: '750e8400-e29b-41d4-a716-446655440001', recordedAt: new Date(1000), ...args.data };
+          return { id: '750e8400-e29b-41d4-a716-446655440001', recipientId: null, recordedAt: new Date(1000), ...args.data };
         },
         async findFirst() {
           return { id: '750e8400-e29b-41d4-a716-446655440002', userId, recipientId: null, category: 'support_circle_sharing', purpose: 'support_circle', action: 'revoke', version: 1, recordedAt: new Date(2000) };
