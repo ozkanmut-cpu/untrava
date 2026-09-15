@@ -23,6 +23,16 @@ export class EventService {
         throw new Error('event user does not match authenticated user');
       }
 
+      if (event.eventType === 'correction' || event.eventType === 'retraction') {
+        const target = await this.repository.findByEventId(event.payload.targetEventId);
+        if (!target) {
+          throw new Error(`${event.eventType} target does not exist`);
+        }
+        if (target.userId !== userId) {
+          throw new Error(`${event.eventType} target belongs to another user`);
+        }
+      }
+
       const status = await this.repository.append(event);
       results.push({ eventId: event.eventId, status });
     }
