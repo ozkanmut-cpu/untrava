@@ -1,8 +1,22 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ConsentLedgerEntry, ConsentRepository } from '../src/modules/consent/consent.service';
+import type { AnonymousIdentity, IdentityRepository } from '../src/modules/identity/service';
 import { buildApp } from '../src/app';
 
 const userId = '550e8400-e29b-41d4-a716-446655440001';
+
+const identityRepository: IdentityRepository = {
+  async createAnonymousUser(input): Promise<AnonymousIdentity> {
+    return {
+      userId,
+      sessionId: '650e8400-e29b-41d4-a716-446655440010',
+      deviceId: input.deviceId,
+    };
+  },
+  async revokeDeviceSession() {
+    return false;
+  },
+};
 
 function memoryRepository(): ConsentRepository {
   const entries: ConsentLedgerEntry[] = [];
@@ -34,7 +48,7 @@ afterEach(async () => { await app?.close(); app = undefined; });
 
 describe('consent routes', () => {
   it('makes a revoke immediately effective', async () => {
-    app = await buildApp({ consentRepository: memoryRepository() });
+    app = await buildApp({ identityRepository, consentRepository: memoryRepository() });
     const headers = { 'x-untrava-user-id': userId };
     const body = {
       category: 'support_circle_sharing',
