@@ -2,57 +2,20 @@ generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
 
 model User {
-  id                   String               @id @default(uuid()) @db.Uuid
-  createdAt            DateTime             @default(now())
-  deviceSessions       DeviceSession[]
-  consentLedgerEntries ConsentLedgerEntry[] @relation("ConsentOwner")
-  quitEvents           QuitEvent[]
-}
-
-model DeviceSession {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  deviceId  String   @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
   createdAt DateTime @default(now())
-  revokedAt DateTime?
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([deviceId])
+  deviceSessions DeviceSession[]
+  consentLedgerEntries ConsentLedgerEntry[] @relation("ConsentOwner")
+  quitEvents QuitEvent[]
+  quitProfile QuitProfile?
+  goals Goal[]
 }
-
-model ConsentLedgerEntry {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @db.Uuid
-  recipientId String?  @db.Uuid
-  category    String
-  purpose     String
-  action      String
-  version     Int
-  recordedAt  DateTime @default(now())
-  user        User     @relation("ConsentOwner", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, category, recipientId, recordedAt])
-}
-
-model QuitEvent {
-  eventId       String   @id @db.Uuid
-  userId        String   @db.Uuid
-  deviceId      String   @db.Uuid
-  eventType     String
-  occurredAt    DateTime
-  recordedAt    DateTime
-  schemaVersion Int
-  payload       Json
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, occurredAt])
-  @@index([deviceId])
-  @@index([eventType])
-}
+model DeviceSession { id String @id @default(uuid()) @db.Uuid userId String @db.Uuid deviceId String @db.Uuid createdAt DateTime @default(now()) revokedAt DateTime? user User @relation(fields:[userId],references:[id],onDelete:Cascade) @@index([userId]) @@index([deviceId]) }
+model ConsentLedgerEntry { id String @id @default(uuid()) @db.Uuid userId String @db.Uuid recipientId String? @db.Uuid category String purpose String action String version Int recordedAt DateTime @default(now()) user User @relation("ConsentOwner",fields:[userId],references:[id],onDelete:Cascade) @@index([userId,category,recipientId,recordedAt]) }
+model QuitEvent { eventId String @id @db.Uuid userId String @db.Uuid deviceId String @db.Uuid eventType String occurredAt DateTime recordedAt DateTime schemaVersion Int payload Json user User @relation(fields:[userId],references:[id],onDelete:Cascade) @@index([userId,occurredAt]) @@index([deviceId]) @@index([eventType]) }
+model QuitProfile { userId String @id @db.Uuid strategy String quitDate DateTime? createdAt DateTime updatedAt DateTime user User @relation(fields:[userId],references:[id],onDelete:Cascade) products ProductBaseline[] }
+model ProductBaseline { id String @id @default(uuid()) @db.Uuid profileUserId String @db.Uuid product String dailyQuantity Float profile QuitProfile @relation(fields:[profileUserId],references:[userId],onDelete:Cascade) @@index([profileUserId]) }
+model Goal { goalId String @id @db.Uuid userId String @db.Uuid type String startsAt DateTime endsAt DateTime? reductionProduct String? reductionDailyQuantity Float? user User @relation(fields:[userId],references:[id],onDelete:Cascade) @@index([userId,startsAt]) }
