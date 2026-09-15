@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: untrava
+      POSTGRES_USER: untrava
+      POSTGRES_PASSWORD: untrava
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U untrava -d untrava']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - untrava-postgres:/var/lib/postgresql/data
+
+volumes:
+  untrava-postgres:
