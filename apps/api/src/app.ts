@@ -1,9 +1,12 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerIdentityRoutes } from './modules/identity/routes';
 import type { IdentityRepository } from './modules/identity/service';
+import { registerConsentRoutes } from './modules/consent/consent.routes';
+import type { ConsentRepository } from './modules/consent/consent.service';
 
 export interface BuildAppOptions {
   identityRepository?: IdentityRepository;
+  consentRepository?: ConsentRepository;
 }
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
@@ -25,6 +28,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   app.get('/health', async () => ({ status: 'ok' as const }));
   await registerIdentityRoutes(app, options.identityRepository);
+  await registerConsentRoutes(app, options.consentRepository);
 
   return app;
 }
