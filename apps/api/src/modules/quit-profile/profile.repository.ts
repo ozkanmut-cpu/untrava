@@ -8,15 +8,9 @@ export class PrismaProfileRepository implements ProfileRepository {
   async saveProfile(profile: QuitProfile): Promise<QuitProfile> {
     const row = await this.prisma.quitProfile.upsert({
       where: { userId: profile.userId },
-      create: {
-        userId: profile.userId, strategy: profile.strategy, quitDate: profile.quitDate ? new Date(profile.quitDate) : null,
-        createdAt: new Date(profile.createdAt), updatedAt: new Date(profile.updatedAt),
-        products: { create: profile.products },
-      },
-      update: {
-        strategy: profile.strategy, quitDate: profile.quitDate ? new Date(profile.quitDate) : null,
-        updatedAt: new Date(profile.updatedAt), products: { deleteMany: {}, create: profile.products },
-      }, include: { products: true },
+      create: { userId: profile.userId, strategy: profile.strategy, quitDate: profile.quitDate ? new Date(profile.quitDate) : null, createdAt: new Date(profile.createdAt), updatedAt: new Date(profile.updatedAt), products: { create: profile.products } },
+      update: { strategy: profile.strategy, quitDate: profile.quitDate ? new Date(profile.quitDate) : null, updatedAt: new Date(profile.updatedAt), products: { deleteMany: {}, create: profile.products } },
+      include: { products: true },
     });
     return QuitProfileSchema.parse({ ...row, quitDate: row.quitDate?.toISOString() ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), products: row.products.map((item) => ({ product: item.product, dailyQuantity: item.dailyQuantity })) });
   }
@@ -24,7 +18,8 @@ export class PrismaProfileRepository implements ProfileRepository {
   async createGoal(goal: Goal): Promise<Goal> {
     const row = await this.prisma.goal.create({ data: {
       goalId: goal.goalId, userId: goal.userId, type: goal.type, startsAt: new Date(goal.startsAt), endsAt: goal.endsAt ? new Date(goal.endsAt) : null,
-      reductionProduct: goal.reductionTarget?.product, reductionDailyQuantity: goal.reductionTarget?.dailyQuantity,
+      reductionProduct: goal.reductionTarget?.product ?? null,
+      reductionDailyQuantity: goal.reductionTarget?.dailyQuantity ?? null,
     } });
     return this.toGoal(row);
   }
