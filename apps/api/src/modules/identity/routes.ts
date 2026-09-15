@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { IdentityService, type AnonymousIdentity, type IdentityRepository } from './service';
 
 const CreateAnonymousIdentitySchema = z.object({ deviceId: z.uuid() });
+const SessionParamsSchema = z.object({ sessionId: z.uuid() });
+const UserHeaderSchema = z.uuid();
 
 class MemoryIdentityRepository implements IdentityRepository {
   private readonly sessions = new Map<string, { userId: string; deviceId: string; revokedAt: Date | null }>();
@@ -35,5 +37,17 @@ export async function registerIdentityRoutes(
 
     const identity = await service.createAnonymousUser(parsed.data.deviceId);
     return reply.code(201).send(identity);
+  });
+
+  app.delete('/v1/device-sessions/:sessionId', async (request, reply) => {
+    const params = SessionParamsSchema.safeParse(request.params);
+    const userId = UserHeaderSchema.safeParse(request.headers['x-untrava-user-id']);
+    if (!params.success || !userId.success) {
+      return reply.code(400).send({ error: 'invalid_request' });
+    }
+
+    const result = await service.revokeDeviceSession(userId.data, params.data.sessionId);
+    if (!result.revoked) return reply.code(404).send({ error: 'session_not_found' });
+    return reply.code(200).send(result);
   });
 }
