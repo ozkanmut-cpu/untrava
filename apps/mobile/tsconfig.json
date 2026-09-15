@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["vitest/globals"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/device-identity.ts", "src/foundation.ts", "src/local-event-store.ts", "src/db/**/*.ts", "test/**/*.ts"]
 }

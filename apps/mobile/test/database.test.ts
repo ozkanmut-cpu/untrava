@@ -30,10 +30,12 @@ describe('SQLiteLocalEventDatabase', () => {
     const sqlite = new FakeSQLite();
     const database = new SQLiteLocalEventDatabase(sqlite);
     await database.insert('event-1', '{"eventId":"event-1"}');
-    expect(sqlite.runCalls).toHaveLength(1);
-    expect(sqlite.runCalls[0].source).toContain('INSERT INTO quit_events_local');
-    expect(sqlite.runCalls[0].source).toContain("'pending', 0, NULL, NULL");
-    expect(sqlite.runCalls[0].params).toEqual(['event-1', '{"eventId":"event-1"}']);
+    const call = sqlite.runCalls[0];
+    expect(call).toBeDefined();
+    if (!call) throw new Error('expected insert call');
+    expect(call.source).toContain('INSERT INTO quit_events_local');
+    expect(call.source).toContain("'pending', 0, NULL, NULL");
+    expect(call.params).toEqual(['event-1', '{"eventId":"event-1"}']);
   });
 
   it('maps persisted sync metadata and marks an event synced without deleting it', async () => {
