@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { RescueContext } from '../../../packages/contracts/src/index';
+import type { RescueContext, RescueSession } from '../../../packages/contracts/src/index';
+import type { RescueSessionStore } from '../src/rescue/session-store';
 import { RescueSessionCoordinator } from '../src/rescue/session';
 
 const context: RescueContext = {
@@ -58,5 +59,34 @@ describe('RescueSessionCoordinator', () => {
     const recovery = coordinator();
     recovery.stabilize('2026-09-16T05:00:01.000Z');
     expect(recovery.reportUse('2026-09-16T05:00:02.000Z').state).toBe('recovery');
+  });
+
+  it('does not advance in-memory state when local persistence fails', () => {
+    let saves = 0;
+    let persisted: RescueSession | null = null;
+    const store: RescueSessionStore = {
+      save(session) {
+        saves += 1;
+        if (saves === 2) throw new Error('local_persistence_failed');
+        persisted = structuredClone(session);
+      },
+      get() {
+        return persisted ? structuredClone(persisted) : null;
+      },
+    };
+
+    const rescue = RescueSessionCoordinator.start(
+      {
+        rescueSessionId: '550e8400-e29b-41d4-a716-446655440011',
+        context,
+        libraryContentVersion: 1,
+        now: '2026-09-16T05:00:00.000Z',
+      },
+      store,
+    );
+
+    expect(() => rescue.stabilize('2026-09-16T05:00:01.000Z')).toThrow('local_persistence_failed');
+    expect(rescue.snapshot().state).toBe('started');
+    expect(persisted?.state).toBe('started');
   });
 });
