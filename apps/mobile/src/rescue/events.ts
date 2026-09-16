@@ -43,6 +43,20 @@ export interface ProductUseInput {
   occurredAt: string;
 }
 
+interface RescueAmendmentInput {
+  userId: string;
+  deviceId: string;
+  rescueSessionId: string;
+  targetEventId: string;
+  occurredAt: string;
+}
+
+export interface RescueCorrectionInput extends RescueAmendmentInput {
+  correction: Record<string, unknown>;
+}
+
+export type RescueRetractionInput = RescueAmendmentInput;
+
 export class RescueEventSinkAdapter {
   constructor(
     private readonly store: LocalEventStore,
@@ -127,5 +141,24 @@ export class RescueEventSinkAdapter {
         quantity: input.quantity,
       },
     });
+  }
+
+  async correction(input: RescueCorrectionInput): Promise<void> {
+    await this.store.append(
+      this.envelope(input, 'correction', {
+        targetEventId: input.targetEventId,
+        rescueSessionId: input.rescueSessionId,
+        correction: input.correction,
+      }),
+    );
+  }
+
+  async retraction(input: RescueRetractionInput): Promise<void> {
+    await this.store.append(
+      this.envelope(input, 'retraction', {
+        targetEventId: input.targetEventId,
+        rescueSessionId: input.rescueSessionId,
+      }),
+    );
   }
 }
