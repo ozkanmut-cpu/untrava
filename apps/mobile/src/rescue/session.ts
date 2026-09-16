@@ -119,6 +119,11 @@ export class RescueSessionCoordinator {
     );
   }
 
+  escalate(now: string): RescueSession {
+    this.requireState('started', 'stabilizing', 'intervention_selected', 'intervention_active', 'reassessing');
+    return this.transition('escalating', now);
+  }
+
   requestSupport(now: string): RescueSession {
     this.requireState('stabilizing', 'intervention_selected', 'intervention_active', 'reassessing', 'escalating');
     if (this.session.context.canContactSupport !== true) throw new Error('support_unavailable');
