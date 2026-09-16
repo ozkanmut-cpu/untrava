@@ -136,6 +136,7 @@ export const RescueContextSchema = z.object({
   deviceId: DeviceIdSchema,
   startedAt: z.iso.datetime(),
   goalType: GoalTypeSchema,
+  goalId: z.uuid().optional(),
   productIntent: RescueProductIntentSchema.optional(),
   cravingIntensity: z.number().min(0).max(10).optional(),
   locationMode: z.enum(['home', 'work', 'social', 'travel', 'unknown']).optional(),
