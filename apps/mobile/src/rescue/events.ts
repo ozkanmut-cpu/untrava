@@ -1,3 +1,4 @@
+import { RescueOutcomeSchema } from '../../../../packages/contracts/src/index';
 import type {
   ProductType,
   QuitEventEnvelope,
@@ -107,6 +108,7 @@ export class RescueEventSinkAdapter {
   }
 
   async interventionOutcome(input: InterventionOutcomeInput): Promise<void> {
+    const outcome = RescueOutcomeSchema.strict().parse(input.outcome);
     await this.store.append(
       this.envelope(input, 'intervention_outcome', {
         rescueSessionId: input.rescueSessionId,
@@ -114,7 +116,7 @@ export class RescueEventSinkAdapter {
         interventionVersion: input.interventionVersion,
         rescueLevel: input.rescueLevel,
         libraryContentVersion: input.libraryContentVersion,
-        ...input.outcome,
+        ...outcome,
       }),
     );
   }
