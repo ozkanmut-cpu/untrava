@@ -83,4 +83,25 @@ describe('RescueLibrarySchema', () => {
       ).success,
     ).toBe(false);
   });
+
+  it('preserves and validates goal-scoped eligibility rules', () => {
+    const parsed = RescueLibrarySchema.parse(
+      library([
+        intervention({
+          eligibility: { allowedGoalTypes: ['smoke_free', 'reduction'] },
+        }),
+      ]),
+    );
+
+    expect(parsed.interventions[0]?.eligibility.allowedGoalTypes).toEqual(['smoke_free', 'reduction']);
+    expect(
+      RescueLibrarySchema.safeParse(
+        library([
+          intervention({
+            eligibility: { allowedGoalTypes: ['unsupported_goal'] },
+          }),
+        ]),
+      ).success,
+    ).toBe(false);
+  });
 });
