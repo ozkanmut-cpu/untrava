@@ -49,6 +49,15 @@ describe('RescueSessionCoordinator', () => {
     expect(rescue.snapshot().state).toBe('intervention_selected');
   });
 
+  it('allows user-requested immediate escalation from an active intervention', () => {
+    const rescue = coordinator();
+    rescue.stabilize('2026-09-16T05:00:01.000Z');
+    rescue.select(selection, '2026-09-16T05:00:02.000Z');
+    rescue.beginSelected('2026-09-16T05:00:03.000Z');
+
+    expect(rescue.escalate('2026-09-16T05:00:04.000Z').state).toBe('escalating');
+  });
+
   it('rejects illegal transitions and supports recovery or support states', () => {
     const rescue = coordinator();
     expect(() => rescue.beginSelected('2026-09-16T05:00:01.000Z')).toThrow('invalid_rescue_transition');
