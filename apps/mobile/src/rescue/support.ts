@@ -35,7 +35,8 @@ export class RescueSupportCoordinator {
     };
   }
 
-  async offerEscalation(_target: SupportActionTarget): Promise<SupportActionResult> {
+  async offerEscalation(target: SupportActionTarget): Promise<SupportActionResult> {
+    void target;
     return (await this.canOfferSupport()) ? { status: 'offered' } : { status: 'unavailable' };
   }
 
