@@ -43,9 +43,11 @@ describe('selectIntervention', () => {
 
   it('filters environment and support interventions when their capabilities are unavailable', () => {
     const candidate = library();
-    expect(
-      selectIntervention(candidate, { ...context, canMoveEnvironment: false }, 'environment_escape')?.level,
-    ).not.toBe('environment_escape');
+    const environmentSelection = selectIntervention(candidate, { ...context, canMoveEnvironment: false }, 'environment_escape');
+    const environmentDefinition = candidate.interventions.find(
+      (item) => item.interventionId === environmentSelection?.interventionId,
+    );
+    expect(environmentDefinition?.level).not.toBe('environment_escape');
     expect(selectIntervention(candidate, { ...context, canContactSupport: false }, 'human_support')).toBeNull();
   });
 });
