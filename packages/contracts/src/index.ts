@@ -4,3 +4,4 @@ export * from './ids';
 export * from './profile';
 export * from './events';
 export * from './consent';
+export * from './rescue';
