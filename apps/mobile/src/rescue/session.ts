@@ -61,6 +61,13 @@ export class RescueSessionCoordinator {
     this.store?.save(this.snapshot());
   }
 
+  private commit(next: RescueSession): RescueSession {
+    const parsed = RescueSessionSchema.parse(next);
+    this.store?.save(structuredClone(parsed));
+    this.session = parsed;
+    return this.snapshot();
+  }
+
   private requireState(...allowed: RescueSessionState[]): void {
     if (!allowed.includes(this.session.state) || terminalStates.has(this.session.state)) {
       throw new Error('invalid_rescue_transition');
@@ -68,9 +75,7 @@ export class RescueSessionCoordinator {
   }
 
   private transition(state: RescueSessionState, now: string): RescueSession {
-    this.session = RescueSessionSchema.parse({ ...this.session, state, updatedAt: now });
-    this.persist();
-    return this.snapshot();
+    return this.commit(RescueSessionSchema.parse({ ...this.session, state, updatedAt: now }));
   }
 
   stabilize(now: string): RescueSession {
@@ -80,16 +85,16 @@ export class RescueSessionCoordinator {
 
   select(selection: InterventionSelection, now: string): RescueSession {
     this.requireState('stabilizing', 'escalating', 'recovery');
-    this.session = RescueSessionSchema.parse({
-      ...this.session,
-      state: 'intervention_selected',
-      interventionId: selection.interventionId,
-      interventionVersion: selection.version,
-      currentStepIndex: 0,
-      updatedAt: now,
-    });
-    this.persist();
-    return this.snapshot();
+    return this.commit(
+      RescueSessionSchema.parse({
+        ...this.session,
+        state: 'intervention_selected',
+        interventionId: selection.interventionId,
+        interventionVersion: selection.version,
+        currentStepIndex: 0,
+        updatedAt: now,
+      }),
+    );
   }
 
   beginSelected(now: string): RescueSession {
@@ -104,14 +109,14 @@ export class RescueSessionCoordinator {
 
   reassess(input: ReassessInput, now: string): RescueSession {
     this.requireState('reassessing');
-    this.session = RescueSessionSchema.parse({
-      ...this.session,
-      outcome: input.outcome ?? this.session.outcome,
-      state: input.wantsAnother ? 'escalating' : 'resolved',
-      updatedAt: now,
-    });
-    this.persist();
-    return this.snapshot();
+    return this.commit(
+      RescueSessionSchema.parse({
+        ...this.session,
+        outcome: input.outcome ?? this.session.outcome,
+        state: input.wantsAnother ? 'escalating' : 'resolved',
+        updatedAt: now,
+      }),
+    );
   }
 
   requestSupport(now: string): RescueSession {
