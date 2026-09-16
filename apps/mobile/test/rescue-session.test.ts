@@ -22,6 +22,15 @@ function coordinator() {
   });
 }
 
+function coordinatorAtReassessment() {
+  const rescue = coordinator();
+  rescue.stabilize('2026-09-16T05:00:01.000Z');
+  rescue.select(selection, '2026-09-16T05:00:02.000Z');
+  rescue.beginSelected('2026-09-16T05:00:03.000Z');
+  rescue.completeIntervention('2026-09-16T05:01:03.000Z');
+  return rescue;
+}
+
 describe('RescueSessionCoordinator', () => {
   it('runs the legal resolve path and pins the selected intervention version', () => {
     const rescue = coordinator();
@@ -47,6 +56,20 @@ describe('RescueSessionCoordinator', () => {
     expect(rescue.reassess({ wantsAnother: true }, '2026-09-16T05:01:04.000Z').state).toBe('escalating');
     rescue.select({ interventionId: 'cbt-reframe', version: 1, reasonCodes: ['escalated'] }, '2026-09-16T05:01:05.000Z');
     expect(rescue.snapshot().state).toBe('intervention_selected');
+  });
+
+  it('proves all four specified exits are available directly from reassessment', () => {
+    const resolved = coordinatorAtReassessment();
+    expect(resolved.reassess({ wantsAnother: false }, '2026-09-16T05:01:04.000Z').state).toBe('resolved');
+
+    const escalated = coordinatorAtReassessment();
+    expect(escalated.reassess({ wantsAnother: true }, '2026-09-16T05:01:04.000Z').state).toBe('escalating');
+
+    const supported = coordinatorAtReassessment();
+    expect(supported.requestSupport('2026-09-16T05:01:04.000Z').state).toBe('support_offered');
+
+    const recovery = coordinatorAtReassessment();
+    expect(recovery.reportUse('2026-09-16T05:01:04.000Z').state).toBe('recovery');
   });
 
   it('allows user-requested immediate escalation from an active intervention', () => {
