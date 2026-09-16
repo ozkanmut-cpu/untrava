@@ -1,18 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import type { QuitEventEnvelope } from '../../../packages/contracts/src/index';
-import { LocalEventStore, type LocalEventDatabase, type LocalEventRow } from '../src/local-event-store';
+import type { SyncEventDatabase } from '../src/db/database';
+import { LocalEventStore, type LocalEventRow } from '../src/local-event-store';
 import { RescueEventSinkAdapter } from '../src/rescue/events';
+import { PersistentSyncQueue } from '../src/sync/sync-queue';
 
-class MemoryDatabase implements LocalEventDatabase {
+class MemoryDatabase implements SyncEventDatabase {
   rows = new Map<string, LocalEventRow>();
   async get(eventId: string) { return this.rows.get(eventId) ?? null; }
   async insert(eventId: string, envelope: string) {
     this.rows.set(eventId, { eventId, envelope, syncState: 'pending', attemptCount: 0, nextAttemptAt: null, syncedAt: null });
   }
-  async listPending(limit: number) { return [...this.rows.values()].slice(0, limit); }
+  async listPending(limit: number) { return [...this.rows.values()].filter((row) => row.syncState === 'pending').slice(0, limit); }
+  async listDue(now: string, limit: number) {
+    return [...this.rows.values()]
+      .filter((row) => row.syncState === 'pending' && (!row.nextAttemptAt || row.nextAttemptAt <= now))
+      .slice(0, limit);
+  }
   async markSynced(eventId: string, syncedAt: string) {
     const row = this.rows.get(eventId);
-    if (row) this.rows.set(eventId, { ...row, syncState: 'synced', syncedAt });
+    if (row) this.rows.set(eventId, { ...row, syncState: 'synced', syncedAt, nextAttemptAt: null });
+  }
+  async markFailed(eventId: string, attemptCount: number, nextAttemptAt: string) {
+    const row = this.rows.get(eventId);
+    if (row) this.rows.set(eventId, { ...row, syncState: 'pending', attemptCount, nextAttemptAt, syncedAt: null });
   }
 }
 
@@ -51,6 +62,33 @@ describe('RescueEventSinkAdapter', () => {
       interventionVersion: 1,
       rescueLevel: 'micro',
       libraryContentVersion: 1,
+    });
+  });
+
+  it('places rescue-generated events into the existing persistent sync queue', async () => {
+    const db = new MemoryDatabase();
+    const store = new LocalEventStore(db);
+    const queue = new PersistentSyncQueue(db);
+    let index = 0;
+    const sink = new RescueEventSinkAdapter(store, () => ids[index++]!, () => '2026-09-16T05:00:01.000Z');
+
+    await sink.interventionStarted({ ...base, reasonCodes: ['user_preferred'] });
+
+    const due = await queue.listDue('2026-09-16T05:00:02.000Z');
+    expect(due).toHaveLength(1);
+    expect(due[0]).toMatchObject({
+      attemptCount: 0,
+      nextAttemptAt: null,
+      event: {
+        eventId: ids[0],
+        eventType: 'intervention_started',
+        payload: {
+          rescueSessionId: base.rescueSessionId,
+          interventionId: base.interventionId,
+          interventionVersion: base.interventionVersion,
+          libraryContentVersion: base.libraryContentVersion,
+        },
+      },
     });
   });
 
