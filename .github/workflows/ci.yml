@@ -10,6 +10,20 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: untrava
+          POSTGRES_USER: untrava
+          POSTGRES_PASSWORD: untrava
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U untrava -d untrava"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://untrava:untrava@localhost:5432/untrava
     steps:
@@ -29,6 +43,8 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Deploy Prisma migrations
+        run: pnpm --filter @untrava/api prisma migrate deploy
       - name: Generate Prisma client
         run: pnpm --filter @untrava/api prisma generate
       - name: Lint
