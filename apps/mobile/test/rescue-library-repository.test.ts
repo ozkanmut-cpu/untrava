@@ -19,9 +19,7 @@ function newerLibrary() {
     contentVersion: 2,
     publishedAt: '2026-09-16T06:00:00.000Z',
     interventions: bundled.interventions.map((item) =>
-      item.interventionId === 'micro-regulate'
-        ? { ...item, version: 2, titleKey: 'rescue.micro-regulate.v2.title' }
-        : item,
+      item.interventionId === 'micro-regulate' ? { ...item, version: 2 } : item,
     ),
   });
 }
@@ -61,6 +59,25 @@ describe('MemoryRescueLibraryRepository', () => {
     corrupted.interventions[0] = { ...corrupted.interventions[0]!, contentHash: 'fnv1a32:v1:corrupt' };
 
     await expect(repository.installValidatedLibrary(corrupted)).rejects.toThrow('rescue_library_integrity_error');
+    expect(await repository.getActiveLibrary()).toEqual(bundled);
+  });
+
+  it('fails closed when a downloaded library references a localization key outside the packaged baseline', async () => {
+    const bundled = createBundledRescueLibrary();
+    const repository = new MemoryRescueLibraryRepository(bundled);
+    const next = newerLibrary();
+    const missingLocalization = sealRescueLibrary({
+      ...next,
+      interventions: next.interventions.map((item) =>
+        item.interventionId === 'micro-regulate'
+          ? { ...item, titleKey: 'rescue.missing-localization.title' }
+          : item,
+      ),
+    });
+
+    await expect(repository.installValidatedLibrary(missingLocalization)).rejects.toThrow(
+      'rescue_library_localization_error',
+    );
     expect(await repository.getActiveLibrary()).toEqual(bundled);
   });
 
