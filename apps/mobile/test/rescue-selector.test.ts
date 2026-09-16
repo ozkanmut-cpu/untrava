@@ -64,4 +64,17 @@ describe('selectIntervention', () => {
     const selected = selectIntervention(library(), context, 'micro', 'recovery');
     expect(selected?.interventionId).toBe('recovery-reset');
   });
+
+  it('uses the hard-coded minimal stabilization fallback when no rescue intervention is eligible', () => {
+    const candidate = library();
+    for (const intervention of candidate.interventions) {
+      intervention.status = 'retired';
+    }
+
+    expect(selectIntervention(candidate, context)).toEqual({
+      interventionId: 'minimal-stabilization-fallback',
+      version: 1,
+      reasonCodes: ['hardcoded_minimal_fallback'],
+    });
+  });
 });
