@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RescueContext, RescueSession } from '../../../packages/contracts/src/index';
-import type { RescueSessionStore } from '../src/rescue/session-store';
+import { MemoryRescueSessionStore, type RescueSessionStore } from '../src/rescue/session-store';
 import { RescueSessionCoordinator } from '../src/rescue/session';
 
 const context: RescueContext = {
@@ -56,6 +56,39 @@ describe('RescueSessionCoordinator', () => {
     rescue.beginSelected('2026-09-16T05:00:03.000Z');
 
     expect(rescue.escalate('2026-09-16T05:00:04.000Z').state).toBe('escalating');
+  });
+
+  it('persists abandonment as a terminal state without losing pinned intervention metadata', () => {
+    const store = new MemoryRescueSessionStore();
+    const rescueSessionId = '550e8400-e29b-41d4-a716-446655440012';
+    const rescue = RescueSessionCoordinator.start(
+      {
+        rescueSessionId,
+        context,
+        libraryContentVersion: 1,
+        now: '2026-09-16T05:00:00.000Z',
+      },
+      store,
+    );
+
+    rescue.stabilize('2026-09-16T05:00:01.000Z');
+    rescue.select(selection, '2026-09-16T05:00:02.000Z');
+    rescue.beginSelected('2026-09-16T05:00:03.000Z');
+
+    expect(rescue.abandon('2026-09-16T05:00:04.000Z')).toMatchObject({
+      state: 'abandoned',
+      libraryContentVersion: 1,
+      interventionId: 'micro-regulate',
+      interventionVersion: 1,
+    });
+    expect(store.get(rescueSessionId)).toMatchObject({
+      state: 'abandoned',
+      libraryContentVersion: 1,
+      interventionId: 'micro-regulate',
+      interventionVersion: 1,
+    });
+    expect(() => rescue.escalate('2026-09-16T05:00:05.000Z')).toThrow('invalid_rescue_transition');
+    expect(() => rescue.abandon('2026-09-16T05:00:06.000Z')).toThrow('invalid_rescue_transition');
   });
 
   it('rejects illegal transitions and supports recovery or support states', () => {
