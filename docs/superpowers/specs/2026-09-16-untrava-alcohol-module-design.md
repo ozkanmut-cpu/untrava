@@ -1,93 +1,182 @@
-# UNTRAVA Alcohol Module — Design Specification
+# UNTRAVA Alcohol Module — V1 Product & Safety Design Specification
 
 **Date:** 2026-09-16  
-**Status:** Approved design direction  
+**Status:** Approved V1 product and safety direction  
 **Branch:** `rescue-interventions`  
 **Parent architecture:** `docs/superpowers/specs/2026-09-16-untrava-core-generalization-design.md`  
 **Core boundary spec:** `docs/superpowers/specs/2026-09-16-untrava-behavior-change-core-boundaries.md`  
-**Scope:** Define the Alcohol Module architecture, medical-safety boundaries, measurement principles, Rescue/Recovery integration and implementation sequence without implementing Alcohol code in this task.
+**Scope:** Define the Alcohol Module V1 as a self-guided, safety-aware alcohol-change system with abstinence and reduction paths, without doctor communication, clinician-plan integration, breathalyzer hardware or BAC verification.
 
-## 1. Decision
+## 1. Product decision
 
-UNTRAVA will add Alcohol as a typed domain module on top of the existing domain-neutral Behavior Change Core.
+UNTRAVA Alcohol V1 will be an **adaptive dual-path behavior-change system** rather than a sobriety-only app.
 
-The Alcohol Module owns alcohol-specific meaning, measurement, goals, use-event schemas, safety policy, Rescue content, Recovery semantics, progress/reporting rules and later pattern/risk feature construction.
+A user may:
 
-The shared Core continues to own identity, consent, immutable event-envelope mechanics, local-first storage, sync/idempotence, goal lifecycle, Rescue state-machine mechanics, Recovery invariants, support boundaries, privacy/logging defaults and future Intelligence interfaces.
+- observe drinking before committing to change;
+- reduce drinking;
+- create alcohol-free days;
+- use explicit amount/time rules;
+- choose abstinence;
+- move between goals only through explicit goal changes.
 
-The key medical decision is that Alcohol safety is **not** one score and is **not** embedded inside Rescue. It is a separate deterministic orchestration layer composed of several independent safety gates.
+All paths share the same deterministic Alcohol Safety Orchestrator.
 
-Target structure:
+The product position is:
+
+> **A safety-aware personal alcohol change system.**
+
+The V1 principles are:
+
+- **Safety without medicalizing every interaction.**
+- **Progress without shame.**
+- **Personalization without giving AI clinical authority.**
+- **Useful before, during and after a drinking decision.**
+- **No dependency on doctor communication or breathalyzer hardware.**
+
+## 2. V1 architecture
 
 ```text
 UNTRAVA Core
 │
 └── Alcohol Module
+    ├── Observe / Baseline
     ├── Alcohol Goals
-    ├── Alcohol Use Events
-    ├── Alcohol Measurement
+    │   ├── abstinence
+    │   ├── reduction
+    │   ├── alcohol-free days
+    │   └── usage limits / planning rules
+    ├── Weekly Planner
+    ├── Alcohol Use Events + Measurement
     ├── Alcohol Safety Orchestrator
     │   ├── AcuteIntoxicationGate
     │   ├── WithdrawalRiskGate
     │   ├── ActiveWithdrawalMonitor
     │   ├── WernickeNutritionGate
     │   ├── InteractionGate
-    │   ├── MedicalVulnerabilityGate
-    │   └── ClinicianPlanAdapter
+    │   └── MedicalVulnerabilityGate
     ├── Alcohol Rescue Library
     ├── Alcohol Recovery
-    ├── Alcohol Progress / Reporting
-    └── Alcohol Pattern/Risk feature builders (later)
+    ├── Pattern Engine
+    ├── Progress / Reporting
+    ├── Micro Learning
+    └── AI Personalization
 ```
 
-## 2. Why Alcohol needs a separate safety architecture
+The shared Core continues to own identity, consent, immutable event-envelope mechanics, local-first storage, sync/idempotence, goal lifecycle, Rescue state-machine mechanics, Recovery invariants, support boundaries, privacy/logging defaults and future Intelligence interfaces.
 
-Alcohol differs materially from Tobacco because a user who is physiologically dependent on alcohol can develop acute withdrawal after abruptly stopping or substantially reducing intake. Severe alcohol withdrawal can include seizures and delirium tremens and can be fatal. Current UK alcohol-treatment guidance explicitly distinguishes self-directed reduction from medically assisted withdrawal and says people with moderate or severe dependence can experience withdrawal after stopping or substantially reducing alcohol, sometimes beginning within hours.
+Core does not know what beer, spirits, ethanol grams, abstinence, alcohol-free days, withdrawal, standard drinks or alcohol intoxication mean.
 
-Therefore UNTRAVA must never implement a generic rule such as:
+## 3. Explicit V1 exclusions
+
+The following are deliberately **not** part of Alcohol V1:
+
+- doctor messaging;
+- telemedicine;
+- clinician dashboard;
+- clinician-plan ingestion/synchronization;
+- prescription or medication-plan import;
+- automatic appointment booking;
+- health-professional data sharing as part of normal Alcohol flows;
+- Bluetooth breathalyzer;
+- camera/device-based sobriety verification;
+- BAC measurement as truth;
+- BAC prediction as a safety authority;
+- biomarker-based sobriety proof;
+- contingency rewards that require alcohol verification hardware.
+
+These exclusions are architectural: V1 must not depend on these features to work safely.
+
+The app may still tell the user that medical assessment is advisable or urgent. That is **care routing**, not doctor integration.
+
+## 4. Core product loop
+
+The primary behavior loop is:
 
 ```text
-user wants abstinence → tell user to stop now
+Observe
+   ↓
+Plan
+   ↓
+Live / Drink / Don't Drink
+   ↓
+Rescue when needed
+   ↓
+Log facts
+   ↓
+Reflect / Recovery
+   ↓
+Learn
+   ↓
+Improve next plan
 ```
 
-The correct architecture is:
+The loop must support both abstinence and moderation/reduction goals.
+
+A drinking event does not erase previous progress and does not automatically label the user as relapsed or failed.
+
+## 5. Onboarding and progressive assessment
+
+The first product question is behavior-focused rather than diagnostic:
+
+> “Alkolle ilişkin konusunda neyi değiştirmek istiyorsun?”
+
+Initial choices:
+
+- `observe_only` — önce düzenimi anlamak istiyorum;
+- `reduction`;
+- `alcohol_free_days`;
+- `abstinence`;
+- `not_sure`.
+
+The app does not require the user to identify as “alcoholic” or accept an AUD diagnosis to begin.
+
+### 5.1 Baseline
+
+V1 should establish a lightweight recent baseline, preferably covering roughly the prior 7–14 days where the user can recall it:
+
+- drinking days;
+- approximate beverage and quantity;
+- usual first-drink time;
+- common context such as alone/social;
+- common planned vs spontaneous use where known.
+
+Perfect recall is not required. Missingness and estimation are explicit rather than fabricated.
+
+### 5.2 Progressive safety questions
+
+Medical safety assessment expands only when relevant signals appear.
+
+Example:
 
 ```text
-alcohol use / goal intent
+daily or near-daily use
+        ↓
+morning drinking / withdrawal-like symptoms / previous difficult stopping
+        ↓
+expanded WithdrawalRisk assessment
+```
+
+This preserves a lightweight onboarding experience for lower-risk users without weakening safety for higher-risk users.
+
+## 6. Alcohol Safety Orchestrator
+
+Alcohol safety is **not** one score and is **not** embedded inside Rescue. It is a separate deterministic orchestration layer composed of independent gates.
+
+Conceptual flow:
+
+```text
+alcohol use / change intent / symptom report
         ↓
 Alcohol Safety Orchestrator
         ↓
-self-guided path allowed
-   OR clinical assessment/routing
-   OR urgent/emergency routing
+self-guided behavior support allowed
+   OR medical assessment advised
+   OR urgent medical assessment
+   OR emergency response
         ↓
-Goal / Rescue / Recovery
+allowed product surface
 ```
-
-Safety routing is a domain concern owned by Alcohol Module. Core must not contain alcohol-withdrawal semantics.
-
-## 3. Medical-safety invariants
-
-The following are non-negotiable:
-
-1. **No autonomous detox authority.** UNTRAVA does not decide that a physiologically dependent person is safe to detox without clinical assessment.
-2. **No autonomous taper plan.** UNTRAVA never invents a schedule such as “drink X today, Y tomorrow”.
-3. **No medication dosing.** UNTRAVA never starts, stops, changes or calculates doses for withdrawal medication, relapse-prevention medication, thiamine or any other medication.
-4. **No AI safety authority.** Generative AI cannot override deterministic medical-safety gates.
-5. **No single-score shortcut.** AUD severity, physical-dependence risk, complicated-withdrawal risk, current withdrawal severity and acute intoxication are distinct concepts.
-6. **Emergency conditions override behavior-change flows.** Suspected overdose, seizure, severe confusion, inability to wake, serious breathing abnormality or comparable emergency signals interrupt normal Rescue/goal flows.
-7. **Withdrawal risk is evaluated before recommending abrupt abstinence or major reduction.**
-8. **History matters.** Prior withdrawal seizures, delirium tremens, repeated withdrawals and serious complications materially affect routing.
-9. **Pregnancy is a specialist-routing condition when alcohol dependence is present.** The app must not resolve the conflict by independently recommending abrupt cessation to a dependent user.
-10. **Wernicke risk is separate from withdrawal severity.** Malnutrition/neurologic risk is evaluated independently and can escalate care.
-11. **Alcohol + other CNS depressants is a separate safety concern.** Opioid/benzodiazepine/sedative co-use must not be treated as ordinary alcohol-use context.
-12. **Safety rules are versioned and auditable.** Every safety decision records the deterministic rule-set version and evidence inputs used.
-13. **Offline essential safety remains available.** The minimum deterministic safety rules needed to block unsafe self-guided actions must ship locally.
-14. **Failure is fail-closed for risky actions.** If required safety data or validated rules are unavailable, the app must not silently authorize a self-guided withdrawal/taper path.
-
-## 4. Alcohol Safety Orchestrator
-
-The orchestrator runs independent gates and combines their results into a routing disposition. It does not diagnose Alcohol Use Disorder and does not prescribe treatment.
 
 Conceptual output:
 
@@ -96,8 +185,7 @@ interface AlcoholSafetyDecision {
   ruleSetVersion: string;
   disposition:
     | 'self_guided_behavior_support_allowed'
-    | 'clinical_assessment_recommended'
-    | 'clinical_plan_required'
+    | 'medical_assessment_advised'
     | 'urgent_medical_assessment'
     | 'emergency_response';
   triggeredGateIds: string[];
@@ -106,74 +194,79 @@ interface AlcoholSafetyDecision {
 }
 ```
 
-The exact TypeScript syntax is deferred to implementation tasks. The important invariant is that Safety produces **routing**, not diagnosis, medication or taper instructions.
+The exact TypeScript shape is deferred to the safety implementation task. The invariant is that Safety produces **routing**, never diagnosis, medication or taper instructions.
 
-### 4.1 AcuteIntoxicationGate
+### 6.1 Medical-safety invariants
 
-Purpose: detect situations where normal behavior-change UX must stop because acute alcohol poisoning or another emergency may be present.
+1. **No autonomous detox authority.** UNTRAVA does not declare a physiologically dependent person safe to detox without clinical assessment.
+2. **No autonomous taper plan.** UNTRAVA never invents a schedule such as “drink X today, Y tomorrow”.
+3. **No medication dosing.** UNTRAVA never starts, stops, changes or calculates doses for withdrawal medication, relapse-prevention medication, thiamine or any other medication.
+4. **No AI safety authority.** Generative AI cannot override deterministic safety gates.
+5. **No single-score shortcut.** AUD screening, physical-dependence risk, complicated-withdrawal risk, current withdrawal severity and acute intoxication are separate concepts.
+6. **Emergency conditions override behavior-change flows.** Suspected overdose, seizure, severe confusion, inability to wake or serious breathing abnormality interrupt normal Rescue/goal UX.
+7. **Withdrawal risk is evaluated before the app encourages abrupt abstinence or major reduction.**
+8. **History matters.** Prior withdrawal seizure, delirium tremens and repeated withdrawal episodes materially affect routing.
+9. **Pregnancy with suspected dependence requires medical/specialist assessment rather than autonomous abrupt-cessation advice.**
+10. **Wernicke/nutrition risk is separate from withdrawal severity.**
+11. **Alcohol plus other CNS depressants is a separate safety concern.**
+12. **Safety rules are versioned and auditable.**
+13. **Essential blocking safety works offline.**
+14. **Risky actions fail closed when required safety information or a validated local rule set is unavailable.**
 
-Signals may include user- or observer-reported:
+### 6.2 AcuteIntoxicationGate
+
+Purpose: interrupt ordinary product UX when acute alcohol poisoning or another emergency may be present.
+
+Potential validated signals include:
 
 - inability to remain conscious or inability to wake;
 - seizure;
 - serious breathing difficulty, markedly slow breathing or long pauses;
 - severe confusion/stupor;
 - repeated vomiting with impaired consciousness;
-- severe hypothermia-like signs, cyanosis/pallor or loss of protective responses;
-- other emergency conditions supplied by validated clinical policy.
+- severe hypothermia-like signs, cyanosis/pallor or loss of protective responses.
 
-Output can escalate directly to `emergency_response`.
+The gate must not estimate safety from drink count alone and must not wait for Rescue completion.
 
-The gate must not attempt to estimate safety from “number of drinks” alone and must not wait for Rescue completion.
+### 6.3 WithdrawalRiskGate
 
-### 4.2 WithdrawalRiskGate
+Purpose: determine whether stopping or substantially reducing alcohol should trigger medical assessment rather than ordinary self-guided abstinence/reduction guidance.
 
-Purpose: assess whether stopping or substantially reducing alcohol could require clinical withdrawal management.
+Structured risk evidence may include:
 
-Risk evidence should include structured history such as:
-
-- prior alcohol-withdrawal seizure;
-- prior delirium tremens or severe withdrawal hallucinosis;
-- repeated prior withdrawal episodes;
+- previous alcohol-withdrawal seizure;
+- previous delirium tremens or severe withdrawal hallucinosis;
+- repeated previous withdrawal episodes;
 - prolonged/heavy regular use pattern;
-- current signs suggestive of withdrawal after reduction;
-- concurrent physiological dependence on benzodiazepines, barbiturates or other relevant sedative-hypnotics;
+- current withdrawal-like signs after reduction;
+- concurrent physiological dependence on benzodiazepines, barbiturates or relevant sedative-hypnotics;
 - epilepsy;
 - significant unstable medical illness;
 - significant active psychiatric illness or cognitive impairment;
-- older age/vulnerability where guideline policy calls for a lower threshold;
-- prior medically assisted withdrawal history and complications;
-- clinician-authored risk flags.
+- age/vulnerability factors covered by the installed clinical policy;
+- prior medically assisted withdrawal and complications.
 
-No single quantity threshold is sufficient on its own to authorize home withdrawal.
+No quantity threshold by itself authorizes home withdrawal.
 
-This gate may return `clinical_assessment_recommended`, `clinical_plan_required` or higher escalation.
+### 6.4 PAWSS policy
 
-### 4.3 PAWSS policy
+PAWSS may inform the structured risk-factor model because it has validation for predicting complicated withdrawal in medically ill inpatient populations.
 
-PAWSS is a clinically validated predictor of complicated alcohol withdrawal in medically ill hospitalized populations and may inform the Alcohol Module’s risk-factor model.
-
-UNTRAVA must **not** use PAWSS as a stand-alone consumer permission rule such as:
+UNTRAVA must not turn PAWSS into a consumer permission rule such as:
 
 ```text
 PAWSS < 4 → safe to detox at home
 ```
 
-Reasons:
+Risk factors can be represented as evidence with provenance, but routing remains a broader versioned policy.
 
-- the strongest prospective validation was in medically ill inpatients;
-- consumer-app conditions differ materially from the validated setting;
-- a low score does not replace clinical assessment when other concerns are present.
+### 6.5 ActiveWithdrawalMonitor
 
-PAWSS-derived factors may be represented as structured evidence, with provenance, but Safety routing remains a broader versioned rule set.
+Purpose: allow structured symptom tracking when a user has already reduced/stopped alcohol or reports possible withdrawal symptoms.
 
-### 4.4 ActiveWithdrawalMonitor
+It is not a diagnostic engine and does not prescribe treatment.
 
-Purpose: track symptoms after a user has reduced/stopped alcohol or is following a clinician-authored withdrawal plan.
-
-This component is not a diagnostic engine and does not prescribe treatment.
-
-It may track structured symptoms such as:
+Potential symptom fields include:
 
 - tremor;
 - sweating;
@@ -182,63 +275,54 @@ It may track structured symptoms such as:
 - sleep disturbance;
 - perceptual disturbance;
 - confusion/disorientation;
-- seizure;
-- other validated symptom fields.
+- seizure.
 
 Serious complications route to urgent/emergency assessment.
 
-### 4.5 CIWA-Ar / SAWS policy
+### 6.6 CIWA-Ar / SAWS policy
 
-CIWA-Ar is a withdrawal **severity** assessment after alcohol withdrawal is present; ASAM explicitly notes that CIWA-Ar and similar symptom scales are not designed to predict whether a person who is not yet symptomatic will develop severe withdrawal.
+CIWA-Ar is a withdrawal-severity tool, not a general pre-cessation predictor for asymptomatic users.
 
 Therefore:
 
-- CIWA-Ar must not be used as the sole pre-cessation risk gate;
-- consumer self-scoring must not become an autonomous medication/treatment algorithm;
-- any future SAWS-style self-monitoring is symptom monitoring only and must remain inside the deterministic escalation architecture;
-- no symptom score may directly calculate benzodiazepine or other medication doses in UNTRAVA.
+- CIWA-Ar must not be the sole pre-cessation risk gate;
+- self-scoring must not become an autonomous treatment or medication algorithm;
+- future SAWS-style self-monitoring is symptom monitoring only;
+- no symptom score can calculate medication doses.
 
-### 4.6 WernickeNutritionGate
+### 6.7 WernickeNutritionGate
 
-Purpose: identify situations where thiamine deficiency/Wernicke encephalopathy risk requires clinical routing.
+Purpose: identify malnutrition/thiamine-deficiency/Wernicke-risk situations needing medical routing.
 
-Potential risk evidence includes validated policy fields such as:
+Potential risk evidence includes:
 
-- harmful/dependent long-term alcohol use;
+- long-term harmful/dependent alcohol use;
 - malnutrition or substantial recent weight loss;
-- low body mass/nutritional concern;
+- low body-mass/nutritional concern;
 - persistent vomiting;
 - decompensated liver disease or other high-risk medical context;
-- peripheral neuropathy/cognitive concerns;
-- clinician-authored nutrition-risk flags.
+- peripheral neuropathy/cognitive concerns.
 
-Potential emergency neurologic signals include:
+Potential urgent neurologic signals include new confusion, ataxia/unsteadiness and abnormal eye-movement/ophthalmologic signs.
 
-- new confusion/disorientation;
-- ataxia/unsteadiness;
-- abnormal eye movements/ophthalmologic signs;
-- other validated Wernicke-suspect findings.
+UNTRAVA may route risk but must not calculate thiamine route or dose.
 
-UNTRAVA may route risk but must never calculate thiamine route or dose. Suspected Wernicke encephalopathy is an urgent medical condition, not a Rescue intervention.
+### 6.8 InteractionGate
 
-### 4.7 InteractionGate
+Purpose: identify alcohol + substance/medication combinations that materially increase acute risk.
 
-Purpose: recognize alcohol + medication/substance combinations that materially increase acute risk.
-
-High-priority examples include:
+High-priority categories include:
 
 - opioids;
 - benzodiazepines;
 - other sedative-hypnotics/CNS depressants;
-- clinician-configured medications with relevant alcohol warnings.
+- other medication categories represented in a versioned interaction policy.
 
-NIAAA identifies alcohol combined with opioids or benzodiazepines as particularly dangerous because of additive/synergistic effects on vital functions including respiration.
+The app may warn or escalate, but it must not tell the user how to alter a prescribed medication.
 
-The app may warn, block unsafe behavior-support suggestions and escalate; it must not independently tell the user how to change prescribed medication.
+### 6.9 MedicalVulnerabilityGate
 
-### 4.8 MedicalVulnerabilityGate
-
-Purpose: add lower-threshold clinical routing where self-directed change requires additional medical context.
+Purpose: lower the threshold for medical assessment where ordinary self-guided change needs additional context.
 
 Examples include:
 
@@ -248,164 +332,358 @@ Examples include:
 - unstable cardiac disease;
 - severe active psychiatric illness;
 - major cognitive impairment;
-- serious concurrent illness;
-- clinician-authored vulnerability flags.
+- serious concurrent illness.
 
-This is not a diagnosis engine. The gate determines whether ordinary self-guided behavior support is appropriate or whether clinician involvement is required.
+This gate routes; it does not diagnose.
 
-### 4.9 Pregnancy policy
-
-For pregnancy:
-
-- Alcohol Module does not present alcohol as safe during pregnancy.
-- If harmful/dependent use is present or physiological dependence is suspected, the app routes to specialist clinical care rather than independently prescribing abrupt cessation.
-- NICE recommends assisted alcohol withdrawal in collaboration with specialist mental-health/alcohol services, preferably inpatient, for pregnant women who are alcohol dependent.
-
-The app therefore distinguishes:
-
-```text
-health goal: avoid alcohol in pregnancy
-```
-
-from:
-
-```text
-medical withdrawal decision: requires specialist assessment when dependence is present
-```
-
-### 4.10 ClinicianPlanAdapter
-
-Purpose: allow UNTRAVA to support a plan authored/approved by a qualified clinician without becoming the prescriber.
-
-A clinician plan may contain:
-
-- permitted behavior targets;
-- planned reduction or medically assisted withdrawal instructions;
-- observation schedule;
-- clinical contact/escalation instructions;
-- medication instructions authored externally by the clinician;
-- plan start/end/version.
-
-UNTRAVA may:
-
-- display the plan;
-- remind the user;
-- capture observations;
-- record adherence facts;
-- execute deterministic safety escalation.
-
-UNTRAVA may **not**:
-
-- invent a plan;
-- change plan quantities;
-- change medication/dose/timing;
-- infer replacement medication;
-- extend or shorten a clinician plan on its own.
-
-## 5. Goal model
+## 7. Goal system
 
 Alcohol goals are module-owned and use the Core Goal lifecycle.
 
-Initial goal families planned for later implementation:
+Initial V1 goal families:
 
+- `observe_only`;
 - `abstinence`;
 - `reduction`;
 - `alcohol_free_days`;
-- `usage_limit`;
-- optionally other validated goal types in future versions.
+- `usage_limit`.
 
-Core stores `goalId`, `moduleId`, lifecycle and immutable goal history. Alcohol Module owns goal configuration and semantics.
+Core stores `goalId`, `moduleId`, lifecycle and immutable history. Alcohol Module owns goal semantics and configuration.
 
-Safety is orthogonal to goal preference. A user may prefer abstinence while Safety still requires clinical withdrawal assessment before abrupt cessation.
+Safety is orthogonal to user preference. A user may choose abstinence while Safety advises medical assessment before abrupt cessation.
 
-Recovery never silently changes the current goal.
+The app does not silently change that goal.
 
-## 6. Alcohol use-event model — design principles
+### 7.1 Primary Goal + planning rules
 
-Detailed schema is deferred to TODO #32, but this spec fixes the principles.
+A goal may have explicit planning rules without becoming a new global goal type.
 
-Canonical use facts should preserve raw measurement inputs rather than only storing a policy-dependent “drink count”.
+Example:
 
-At minimum the Alcohol Module should be able to represent:
+```text
+Primary goal: reduction
+Rules:
+- Mon–Thu alcohol-free
+- Friday limit X
+- Saturday limit Y
+- no drinking before a selected time
+- no unplanned drinking
+```
 
-- beverage type/category;
+Another user may choose:
+
+```text
+Primary goal: abstinence
+Start date: explicit date
+Preferred action when craving: Rescue first
+```
+
+Exact goal-config contracts are defined in roadmap item #31.
+
+## 8. Weekly Planner
+
+V1 includes a first-class weekly planning surface.
+
+Each day can contain an explicit intent such as:
+
+- alcohol-free;
+- planned drinking with a user-defined limit;
+- observation/no committed limit;
+- a time-based rule where supported by the selected goal.
+
+Plans are user-authored. AI may suggest reflection prompts or proposed adjustments, but it cannot change the plan without explicit confirmation.
+
+Historical plans are retained so outcomes can be compared against what the user actually intended at the time.
+
+## 9. Alcohol use-event model and measurement
+
+Detailed contracts are defined in roadmap item #32, but the architecture fixes the canonical facts.
+
+A use event should be able to represent:
+
+- beverage/category;
 - volume;
-- alcohol by volume (ABV) when known;
-- calculated pure-ethanol amount;
+- ABV when known;
+- calculated pure ethanol amount;
 - event time;
-- context/trigger metadata;
+- social/environment context;
 - planned vs unplanned status;
-- source/provenance and confidence for estimated quantities.
+- trigger/mood context when voluntarily supplied;
+- source/provenance;
+- confidence for estimated quantities.
 
-### 6.1 Standard-drink policy
+### 9.1 Fast logging
 
-A “standard drink” is jurisdiction-dependent. NIAAA uses 14 g pure alcohol for the U.S.; WHO tracks whether countries define a national standard drink, confirming that this is a policy-level concept rather than a universal storage unit.
+Logging must remain low-friction.
 
-Therefore:
+V1 should support user-defined or learned favorites such as:
 
-- canonical storage must not be only `standardDrinks: number`;
-- pure-ethanol calculation and raw beverage inputs must be retained;
-- standard-drink/unit conversion uses an explicit versioned `measurementProfile` or `guidanceProfile`;
-- changing locale/guideline must not rewrite historical raw facts.
+```text
+50 cl beer, 5%
+150 ml wine, 13%
+50 ml spirit, 40%
+```
 
-Core must not know any standard-drink definition.
+A one-tap “same as previous” action is desirable.
 
-## 7. “Safe drinking” language
+The user is never forced to complete every contextual field before a factual use event can be recorded.
 
-UNTRAVA must not label a quantity as universally “safe”. WHO states that no form of alcohol consumption is risk-free and that even low levels carry some risk.
+### 9.2 Standard-drink policy
 
-The app may display jurisdiction-specific **lower-risk guidance** or clinical targets when appropriate, but those values must be:
+A standard drink is jurisdiction-dependent. Canonical storage must therefore not be only `standardDrinks`.
+
+Raw facts and pure-ethanol representation are preserved. Standard-drink or unit conversion uses an explicit versioned measurement/guidance profile.
+
+Changing locale or guideline does not rewrite historical raw facts.
+
+Core does not know any standard-drink definition.
+
+### 9.3 No alcoholmeter/BAC dependency
+
+Self-report is the V1 source of truth for drinking facts unless another non-device source is explicitly added later.
+
+V1 does not use:
+
+- breathalyzer readings;
+- BAC estimates as safety truth;
+- camera verification;
+- intoxication proof;
+- sobriety verification hardware.
+
+The absence of these devices must not reduce the correctness of deterministic symptom/history-based safety gates.
+
+## 10. Planned vs unplanned drinking
+
+Plan adherence is modeled as factual comparison rather than moral judgment.
+
+Examples:
+
+```text
+Plan: 3
+Actual: 3
+→ plan fulfilled
+```
+
+```text
+Plan: 1
+Actual: 3
+→ plan exceeded
+```
+
+```text
+Plan: alcohol-free
+Actual: 1
+→ unplanned use
+```
+
+The third state is not automatically emitted as `relapse` or `goal_failed`.
+
+This distinction becomes a core input for Progress, Recovery and later Pattern Intelligence.
+
+## 11. Alcohol Rescue
+
+Alcohol Rescue reuses the Core Rescue state machine with Alcohol-owned context, content, eligibility and safety policy.
+
+The primary UX includes an always-accessible action equivalent to:
+
+> **“Şu an içmek istiyorum.”**
+
+Rescue remains offline and starts with the least burdensome useful intervention.
+
+Potential V1 intervention families:
+
+- micro regulation/breathing;
+- urge surfing / ACT;
+- short delay;
+- non-alcohol substitution;
+- environment change;
+- CBT reframe;
+- brief distraction/action task;
+- explicit user-controlled human support;
+- Recovery-specific reset/support.
+
+Conceptual escalation:
+
+```text
+micro reset
+   ↓ still craving
+urge surfing / guided intervention
+   ↓ still craving
+delay
+   ↓ still craving
+environment change
+   ↓ still craving
+optional human support offer
+```
+
+The user can explicitly request escalation sooner.
+
+Safety always precedes or constrains Rescue when medically relevant. Rescue cannot instruct abrupt cessation when withdrawal risk requires medical assessment.
+
+Human support remains explicit-action only; no automatic message/call is sent.
+
+## 12. Alcohol Recovery
+
+Alcohol Recovery is triggered after a use event when reflection/support is useful, especially after unplanned or plan-exceeding use.
+
+The tone is factual and non-punitive.
+
+Conceptual flow:
+
+```text
+What happened?
+   ↓
+Was this planned?
+   ↓
+What was the trigger/context?
+   ↓
+Do you want Rescue now?
+   ↓
+Keep tomorrow's plan or explicitly change it?
+```
+
+Core invariants remain:
+
+- use is appended as fact;
+- previous progress/history is preserved;
+- a single event does not automatically create relapse/failure;
+- current `goalId` is preserved unless explicitly changed;
+- outcome facts do not make causal efficacy claims.
+
+## 13. Pattern Engine
+
+Pattern analysis is part of Alcohol V1 product design, while detailed data contracts remain roadmap item #37.
+
+Potential derived patterns include:
+
+- time-of-day concentration;
+- day-of-week concentration;
+- planned vs unplanned use trends;
+- plan-exceedance patterns;
+- drinking-alone vs social associations;
+- first-drink-time trends;
+- trigger/mood associations;
+- alcohol-free-day patterns;
+- Rescue usage/outcome associations;
+- total ethanol trends.
+
+The system must distinguish association from causation.
+
+Example acceptable wording:
+
+> “Stres bildirdiğin günlerde kullanımın daha yüksek görünüyor.”
+
+Not acceptable as an unsupported causal claim:
+
+> “Stres içmene neden oluyor.”
+
+## 14. Personal Trigger Map
+
+V1 may summarize recurring combinations as a user-facing trigger map:
+
+```text
+WHEN: Friday evening
+WHERE/CONTEXT: home
+WITH: alone
+BEFORE: stress reported
+DRINK: spirits
+RESULT: plan often exceeded
+```
+
+This is derived evidence with provenance, not a diagnosis.
+
+## 15. Daily check-in
+
+Daily check-in should be optional and brief rather than a mandatory questionnaire.
+
+Potential fields:
+
+- mood;
+- craving 0–10;
+- today’s plan readiness;
+- sleep quality.
+
+The user can disable reminders/check-ins.
+
+Check-in data may enrich Pattern Engine and personalization but cannot become a safety override.
+
+## 16. Micro-learning journey
+
+V1 includes short educational/behavior-change content rather than requiring long courses.
+
+Candidate topics:
+
+- craving and habit loops;
+- trigger → urge → behavior;
+- alcohol and sleep;
+- tolerance;
+- planning and implementation intentions;
+- social pressure;
+- ACT;
+- CBT;
+- urge surfing;
+- lapse/use event ≠ total failure;
+- interpreting progress across abstinence and reduction goals.
+
+Content can adapt to user-relevant patterns. Irrelevant lessons should not be repeatedly forced.
+
+Educational personalization does not change deterministic safety policy.
+
+## 17. Progress model
+
+Progress is multi-dimensional rather than dominated by a single sober streak.
+
+Possible V1 metrics:
+
+- alcohol-free days;
+- plan-fulfilled days;
+- pure-ethanol trend;
+- heavy-use episode trend where a versioned guidance definition is applicable;
+- unplanned-use trend;
+- plan-exceedance trend;
+- Rescue usage count;
+- factual Rescue outcomes;
+- average first-drink time;
+- money estimate where user supplies sufficient data;
+- craving trend;
+- sleep association where data exists.
+
+Metric prominence depends on the user’s goal.
+
+Abstinence users may see alcohol-free/sober-day metrics first. Reduction users see reduction, planning and heavy-use metrics first.
+
+### 17.1 Streak policy
+
+Streaks may be displayed but must not erase history.
+
+If an alcohol-free streak ends, the prior alcohol-free days remain part of the user’s progress.
+
+Example:
+
+```text
+Current streak: 0
+Last streak: 12 days
+Alcohol-free days in last 30: 27
+```
+
+This prevents one event from visually destroying all prior progress.
+
+## 18. “Safe drinking” language
+
+UNTRAVA does not label an amount as universally safe.
+
+The product may display jurisdiction-specific **lower-risk guidance**, but guidance must be:
 
 - source-attributed;
 - versioned;
 - jurisdiction-aware;
-- clearly distinguished from a guarantee of safety.
+- clearly differentiated from a guarantee of safety.
 
-## 8. Alcohol Rescue
+Raw historical facts are never rewritten when guidance changes.
 
-Alcohol Rescue reuses the Core Rescue state machine but uses Alcohol-owned context, eligibility, content and safety policy.
+## 19. Alcohol use-risk vs AUD vs dependence vs withdrawal
 
-Potential intervention families for later implementation include:
-
-- urge/craving regulation;
-- delay;
-- non-alcohol substitution;
-- environment change;
-- ACT urge surfing;
-- CBT reframe;
-- human support;
-- Recovery-specific reset/support.
-
-Critical ordering rule:
-
-```text
-Alcohol Safety Orchestrator
-        ↓
-allowed behavior-support surface
-        ↓
-Core Rescue orchestration
-        ↓
-Alcohol intervention content
-```
-
-Rescue cannot bypass a medical safety decision. For example, if the user appears at significant risk of dangerous withdrawal, Rescue may offer coping/support while arranging clinical routing, but must not instruct abrupt cessation as a generic craving intervention.
-
-## 9. Alcohol Recovery
-
-Alcohol Recovery adopts the existing Core non-punitive invariants:
-
-- an alcohol-use event is appended as fact;
-- previous progress/history is not deleted;
-- a single use does not automatically create a `relapse` or `goal_failed` fact;
-- current `goalId` is preserved unless the user explicitly changes it;
-- Recovery language is non-shaming;
-- outcomes are factual observations, not causal proof that an intervention worked.
-
-This supports abstinence and non-abstinence goals without treating every episode as total failure.
-
-## 10. Alcohol use-risk vs AUD vs dependence vs withdrawal
-
-The Alcohol Module must keep these concepts separate:
+The Alcohol Module keeps these distinct:
 
 ```text
 AlcoholUseRisk
@@ -416,30 +694,93 @@ CurrentWithdrawalSeverity
 AcuteIntoxicationRisk
 ```
 
-They are related but not interchangeable.
+AUDIT/AUDIT-C-style screening may become a validated input, but:
 
-AUDIT/AUDIT-C-style screening may be added as validated screening inputs, but:
-
-- screening does not diagnose AUD by itself;
+- screening does not independently diagnose AUD;
 - AUD score is not a withdrawal-safety score;
-- withdrawal routing must consider withdrawal-specific history and current medical context.
+- withdrawal routing uses withdrawal-specific history and current medical context.
 
-## 11. Labs and connected health data
+## 20. Connected health/lab boundary
 
-Future integrations may supply liver tests, blood counts, diagnoses, medication lists, sleep/activity or other health data.
+Future health connections may contribute labs, medication lists, diagnoses, sleep/activity or other data.
 
-Rules:
+V1 architecture rules:
 
 - labs are contextual evidence, not autonomous AUD diagnosis;
 - normal liver tests do not prove absence of alcohol-related liver disease;
-- abnormal liver tests do not prove alcohol causation;
-- medication lists can inform InteractionGate but do not authorize medication changes;
-- all connected-health inputs carry provenance and freshness metadata;
-- uncertainty/missingness must be explicit.
+- abnormal tests do not prove alcohol causation;
+- medication data may inform InteractionGate but never authorize medication changes;
+- provenance and freshness are explicit;
+- uncertainty/missingness is explicit.
 
-## 12. Safety rule versioning
+No doctor communication is implied by reading connected health data.
 
-Every deterministic safety policy must have immutable version identity.
+## 21. AI personalization
+
+AI may assist with:
+
+- journal/reflection summarization;
+- pattern explanation;
+- weekly review;
+- personalized micro-learning selection;
+- Rescue wording personalization;
+- goal reflection;
+- suggested plan questions.
+
+Example weekly review:
+
+> “Bu hafta 4 alcohol-free day hedefledin ve 4'ünü tamamladın. Cuma planın 2 idi, 4 olarak kaydettin. Son üç haftada cuma akşamları benzer bir pattern var. Gelecek cuma planını gözden geçirmek ister misin?”
+
+AI may not:
+
+- reduce or override a safety disposition;
+- authorize withdrawal/detox;
+- generate taper schedules;
+- prescribe medication;
+- mutate raw use facts;
+- silently change goals or weekly plans;
+- automatically contact support;
+- present correlation as proven causation.
+
+Removing AI entirely must not break Safety, logging, Rescue, Recovery or basic Progress.
+
+## 22. User-controlled support
+
+Doctor communication is excluded, but user-controlled personal support remains allowed through the shared Support boundary.
+
+The user may optionally save people they choose to contact when struggling.
+
+UNTRAVA may offer:
+
+> “Destek kişini aramak ister misin?”
+
+External action occurs only after explicit user action.
+
+The app sends no automatic message and makes no automatic call.
+
+Community/social network functionality is **not** required for V1. It may be designed later because moderation, harmful advice and privacy substantially expand scope.
+
+## 23. Privacy and logging
+
+Alcohol data is sensitive behavioral/health information.
+
+Operational logs must not contain:
+
+- free-text drinking narratives;
+- full use-event payloads;
+- medication lists;
+- pregnancy status;
+- withdrawal symptom detail;
+- support contact details;
+- exact location.
+
+Safe operational metadata may include constrained identifiers such as module id, rule-set version, gate id, coarse disposition code and non-sensitive error class under the shared Core logging allowlist.
+
+Local-first operation remains preferred. Sync must not be required for immediate Safety/Rescue/Recovery use.
+
+## 24. Safety rule versioning
+
+Every deterministic Alcohol safety policy has immutable version identity.
 
 Conceptually:
 
@@ -451,137 +792,104 @@ sourceGuidelineRefs[]
 checksum
 ```
 
-A safety decision records the version used. Historical safety decisions remain interpretable after guidelines change.
+Every safety decision records the installed rule-set version and evidence references used.
 
-Updated rule sets install with integrity validation and fail closed. A running clinical/safety flow must not silently jump rule versions mid-decision.
+A running safety decision must not silently jump rule versions.
 
-## 13. Offline behavior
+Invalid/corrupt essential rule sets fail closed for risky self-guided withdrawal decisions.
 
-The following must work without network or generative AI:
+## 25. Offline behavior
 
-- alcohol-use event capture;
-- canonical measurement calculation using installed measurement profile;
-- essential emergency/withdrawal-risk blocking gates;
-- current safety rule set lookup;
-- Rescue state machine;
-- Recovery flow;
+The following must work without server or generative AI:
+
+- use-event capture;
+- measurement calculations from installed profiles;
+- essential emergency/withdrawal blocking gates;
+- current safety rule-set lookup;
+- Weekly Planner read/write;
+- Rescue;
+- Recovery;
 - local immutable event persistence;
-- clinician-plan viewing if previously cached and validated;
+- basic progress calculations;
 - queued sync.
 
-If an essential safety rule set is corrupt/missing, the app may still capture facts but must not authorize a risky self-guided withdrawal path.
+If essential safety rules are unavailable/corrupt, facts may still be recorded but risky self-guided withdrawal guidance is not authorized.
 
-## 14. Privacy and logging
+## 26. Cross-module coexistence
 
-Alcohol data may contain particularly sensitive health and behavioral information.
-
-Operational logs must not contain:
-
-- free-text drinking narratives;
-- full use-event payloads;
-- medication lists;
-- exact clinical-plan contents;
-- pregnancy status;
-- withdrawal symptom details;
-- contact details;
-- exact location.
-
-Safe operational metadata may include constrained identifiers such as module id, rule-set version, gate id, coarse disposition code and non-sensitive error class, subject to the shared Core logging allowlist.
-
-## 15. Intelligence boundary
-
-Future Alcohol Intelligence may derive patterns such as time-of-day risk, trigger clusters, goal adherence, consumption trends or Rescue-response patterns.
-
-It may provide:
-
-- derived pattern facts;
-- ranked candidate interventions;
-- explanatory summaries with provenance;
-- uncertainty/confidence metadata.
-
-It may **not**:
-
-- override Alcohol Safety Orchestrator;
-- authorize detox;
-- generate taper schedules;
-- prescribe medication;
-- mutate raw use facts;
-- change goals;
-- trigger Support automatically;
-- present correlation as proven causation.
-
-Removing Intelligence entirely must not break offline Alcohol Rescue/Recovery/safety routing.
-
-## 16. Cross-module coexistence
-
-A user may simultaneously have Tobacco and Alcohol goals.
+A user may have Tobacco and Alcohol goals simultaneously.
 
 Requirements:
 
-- `moduleId` namespaces domain data;
-- one module cannot mutate another module’s goals/events;
-- Alcohol Safety does not affect Tobacco schemas;
-- Tobacco Safety does not interpret Alcohol events;
-- both share Core event store/sync infrastructure;
+- `moduleId` namespaces data;
+- Alcohol cannot mutate Tobacco goals/events;
+- Tobacco cannot interpret Alcohol event schemas;
+- Alcohol Safety does not alter Tobacco rules;
+- both use shared Core event store/sync infrastructure;
 - corrections/retractions retain module identity;
-- cross-module intelligence, if ever added, requires an explicit normalized adapter and consent rather than direct raw-schema coupling.
+- any future cross-module Intelligence requires explicit normalized adapters and consent.
 
-## 17. Error handling / fail-closed behavior
+## 27. Error handling / fail-closed behavior
 
 Examples:
 
-- invalid/corrupt Alcohol safety rule set → do not authorize risky self-guided withdrawal;
-- unknown clinician-plan version → display unavailable/stale state, do not infer replacements;
-- impossible measurement inputs → preserve user intent as draft/error state, do not fabricate ethanol quantity;
-- stale medication/medical context → show freshness uncertainty and use conservative routing where required by policy;
-- unavailable AI/server → deterministic safety/Rescue/Recovery continue locally;
-- persistence failure during safety/session transition → state does not advance until local persistence succeeds.
+- invalid Alcohol safety rule set → do not authorize risky self-guided withdrawal;
+- impossible measurement input → preserve draft/error state, do not fabricate ethanol quantity;
+- stale medication/medical context → represent freshness uncertainty and route conservatively where policy requires;
+- unavailable AI/server → deterministic Safety/Planner/Rescue/Recovery continue locally;
+- persistence failure during state transition → state does not advance until local persistence succeeds;
+- missing breathalyzer/BAC data → irrelevant because V1 does not depend on those data sources.
 
-## 18. Acceptance criteria for the Alcohol Module architecture
+## 28. V1 acceptance criteria
 
-This design is considered implemented only when later tasks prove all of the following:
+The Alcohol V1 architecture is implemented only when later tasks prove all of the following:
 
-1. Core source contains no Alcohol goal enums, beverage types, standard-drink rules or withdrawal logic.
-2. Alcohol Module has module-owned goals and use-event schemas.
-3. Raw measurement inputs and pure-ethanol representation are preserved independently of jurisdiction-specific standard-drink display.
-4. Acute intoxication/emergency routing can interrupt normal Rescue.
-5. Withdrawal risk is evaluated independently of craving/Rescue.
-6. PAWSS is not a consumer stand-alone permission rule.
-7. CIWA-Ar is not used as pre-withdrawal risk prediction or autonomous medication dosing.
-8. Wernicke/nutrition risk has an independent gate.
-9. Opioid/benzodiazepine/sedative interaction risk has an independent gate.
-10. Pregnancy + dependence routes to specialist clinical assessment rather than autonomous abrupt-cessation advice.
-11. UNTRAVA never generates its own taper schedule.
-12. UNTRAVA never generates medication dosing.
-13. Clinician-authored plans are immutable/versioned inputs; UNTRAVA cannot change them autonomously.
-14. Alcohol Rescue cannot override medical safety gates.
-15. Alcohol Recovery preserves history and goal identity and remains non-punitive.
-16. Essential safety routing works offline with a validated locally installed rule set.
-17. Safety decisions record rule-set version and evidence references.
-18. Tobacco acceptance behavior remains unchanged.
-19. Tobacco + Alcohol coexist on the shared local event store/sync path without schema collision.
-20. Exact-HEAD CI remains green after each implementation milestone.
+1. Core contains no Alcohol goal enums, beverage types, standard-drink rules or withdrawal logic.
+2. Alcohol Module has module-owned goal and use-event schemas.
+3. Observe, abstinence and reduction-oriented paths can coexist without separate product silos.
+4. Raw beverage/volume/ABV facts and pure-ethanol representation are preserved independently of standard-drink display.
+5. Weekly plans are explicit user-owned records and can be compared with actual use.
+6. Planned vs unplanned use is represented without automatically creating relapse/failure facts.
+7. Acute intoxication/emergency routing can interrupt normal Rescue.
+8. Withdrawal risk is independent of craving/Rescue.
+9. PAWSS is not a consumer stand-alone detox-permission rule.
+10. CIWA-Ar is not used as a pre-withdrawal risk predictor or autonomous medication algorithm.
+11. Wernicke/nutrition risk has an independent gate.
+12. Opioid/benzodiazepine/sedative interaction risk has an independent gate.
+13. Pregnancy + suspected dependence routes to medical/specialist assessment rather than autonomous abrupt-cessation advice.
+14. UNTRAVA generates no taper schedule.
+15. UNTRAVA generates no medication dosing.
+16. Alcohol Rescue cannot override medical safety gates.
+17. Alcohol Recovery preserves history and goal identity and remains non-punitive.
+18. Pattern insights distinguish association from causation.
+19. Progress is multi-dimensional; one use event does not erase prior progress.
+20. Essential Safety, Planner, Rescue and Recovery work offline with validated local rules/content.
+21. No doctor communication, clinician-plan integration, breathalyzer or BAC verification is required for V1 operation.
+22. User support actions remain explicit-action only.
+23. Tobacco acceptance behavior remains unchanged.
+24. Tobacco + Alcohol coexist on the shared event-store/sync path without schema collision.
+25. Exact-HEAD CI is green after each implementation milestone.
 
-## 19. Implementation sequence mapped to roadmap
+## 29. Roadmap mapping
 
-This spec defines architecture only. Implementation remains deliberately decomposed:
+This spec defines product/safety architecture. Implementation remains decomposed:
 
-- **#31** Alcohol goal types and goal-config contracts.
-- **#32** Alcohol use-event model and measurement contracts.
-- **#33** Alcohol-specific Safety Engine/Orchestrator and dangerous-withdrawal routing.
-- **#34** Hard invariant: no taper/medication dosing authority.
+- **#31** Alcohol goal types and goal-config contracts, including Observe and planning-compatible goal configuration.
+- **#32** Alcohol use-event model, canonical measurement and planned/unplanned facts.
+- **#33** Alcohol Safety Orchestrator and dangerous-withdrawal/emergency routing.
+- **#34** Hard invariant: no taper or medication-dosing authority.
 - **#35** Alcohol Rescue Library.
 - **#36** Alcohol Recovery Flow.
 - **#37** Alcohol Pattern/Risk Engine data contracts.
-- **#38** Alcohol vertical offline E2E.
+- **#38** Alcohol vertical offline E2E including Planner → Log → Rescue/Recovery → Progress.
 - **#39** Tobacco + Alcohol cross-module coexistence test.
 - **#40** Intelligence Engines only after Core + Tobacco + Alcohol prerequisites are green.
 
-No #31–#39 implementation is part of this document commit.
+Weekly Planner, progress semantics, micro-learning and AI personalization are architectural requirements introduced by this V1 design and should be decomposed into explicit implementation tasks before the Alcohol milestone is considered product-complete. They must not be silently omitted merely because the older roadmap ended at #39.
 
-## 20. Medical evidence and source policy
+## 30. Medical evidence and source policy
 
-The medical architecture above is grounded in current authoritative guidance and validation literature available as of 2026-09-16. These references guide architecture; they are not copied into code as permanent unversioned medical truth. Production safety policy must record source/version metadata so later guideline updates can be reviewed and deployed deliberately.
+The safety architecture is grounded in authoritative guidance and validation literature available as of 2026-09-16. References guide architecture; they are not copied into code as permanent unversioned medical truth. Production safety rules must record source/version metadata so guideline changes can be reviewed and deployed deliberately.
 
 Primary references:
 
@@ -599,18 +907,20 @@ Primary references:
 12. WHO Global Health Observatory, *Alcohol policy: standard drink defined*. https://www.who.int/data/gho/data/indicators/indicator-details/GHO/standard-drink-defined
 13. Maldonado JR et al. *Prospective Validation Study of the Prediction of Alcohol Withdrawal Severity Scale (PAWSS) in Medically Ill Inpatients*. Alcohol Alcohol. 2015;50(5):509-518. PMID 25999438. https://pubmed.ncbi.nlm.nih.gov/25999438/
 
-## 21. Non-goals
+## 31. Non-goals
 
-This spec does not:
+This V1 spec does not:
 
 - diagnose AUD;
-- create a medical device claim;
+- create a medical-device claim;
 - define medication regimens;
 - define a taper protocol;
-- implement PAWSS/CIWA-Ar scoring;
-- define final Alcohol event TypeScript schemas (#32);
-- implement safety logic (#33/#34);
-- implement Rescue content (#35);
-- implement Alcohol Intelligence (#37/#40);
+- implement PAWSS/CIWA-Ar medication logic;
+- communicate with doctors;
+- ingest clinician-authored treatment plans;
+- require a breathalyzer;
+- require BAC calculation/verification;
+- require community/social networking;
+- implement final #31–#39 contracts/flows inside this design-doc commit;
 - merge to `main`;
 - touch production infrastructure.
