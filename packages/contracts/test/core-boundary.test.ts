@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import * as coreEvents from '../src/core/events';
+import * as coreGoals from '../src/core/goals';
 import { BehaviorEventEnvelopeBaseSchema } from '../src/core/events';
 import { CoreGoalRecordSchema, ModuleIdSchema } from '../src/core/goals';
 
@@ -37,5 +39,12 @@ describe('domain-neutral Core contracts', () => {
     expect(event.moduleId).toBe('example_behavior');
     expect(event.eventType).toBe('custom_fact');
     expect(event.payload).toEqual({ arbitraryDomainValue: 42 });
+  });
+
+  it('does not expose Tobacco domain enums from Core modules', () => {
+    expect(coreGoals).not.toHaveProperty('GoalTypeSchema');
+    expect(coreGoals).not.toHaveProperty('ProductTypeSchema');
+    expect(coreEvents).not.toHaveProperty('QuitEventEnvelopeSchema');
+    expect(coreEvents).not.toHaveProperty('ProductTypeSchema');
   });
 });
