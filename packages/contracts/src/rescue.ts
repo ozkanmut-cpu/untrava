@@ -51,6 +51,7 @@ export const InterventionEligibilitySchema = z.object({
   requiresEnvironmentMove: z.boolean().optional(),
   requiresAudio: z.boolean().optional(),
   requiresSupport: z.boolean().optional(),
+  allowedGoalTypes: z.array(GoalTypeSchema).min(1).optional(),
 });
 
 export const InterventionSafetyMetadataSchema = z.object({
