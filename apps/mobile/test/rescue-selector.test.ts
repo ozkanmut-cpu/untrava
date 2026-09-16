@@ -50,4 +50,18 @@ describe('selectIntervention', () => {
     expect(environmentDefinition?.level).not.toBe('environment_escape');
     expect(selectIntervention(candidate, { ...context, canContactSupport: false }, 'human_support')).toBeNull();
   });
+
+  it('never selects an intervention outside the current goal type', () => {
+    const candidate = library();
+    const micro = candidate.interventions.find((item) => item.interventionId === 'micro-regulate');
+    if (!micro) throw new Error('missing bundled intervention');
+    micro.eligibility.allowedGoalTypes = ['nicotine_free'];
+
+    expect(selectIntervention(candidate, context)?.interventionId).not.toBe('micro-regulate');
+  });
+
+  it('requires recovery-eligible interventions in recovery mode', () => {
+    const selected = selectIntervention(library(), context, 'micro', 'recovery');
+    expect(selected?.interventionId).toBe('recovery-reset');
+  });
 });
