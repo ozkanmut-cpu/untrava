@@ -63,15 +63,15 @@ describe('RescueSessionCoordinator', () => {
 
   it('does not advance in-memory state when local persistence fails', () => {
     let saves = 0;
-    let persisted: RescueSession | null = null;
+    const persisted: { value: RescueSession | null } = { value: null };
     const store: RescueSessionStore = {
       save(session) {
         saves += 1;
         if (saves === 2) throw new Error('local_persistence_failed');
-        persisted = structuredClone(session);
+        persisted.value = structuredClone(session);
       },
       get() {
-        return persisted ? structuredClone(persisted) : null;
+        return persisted.value ? structuredClone(persisted.value) : null;
       },
     };
 
@@ -87,6 +87,6 @@ describe('RescueSessionCoordinator', () => {
 
     expect(() => rescue.stabilize('2026-09-16T05:00:01.000Z')).toThrow('local_persistence_failed');
     expect(rescue.snapshot().state).toBe('started');
-    expect(persisted?.state).toBe('started');
+    expect(persisted.value?.state).toBe('started');
   });
 });
