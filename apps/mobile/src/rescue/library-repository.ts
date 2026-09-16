@@ -3,6 +3,7 @@ import {
   type RescueLibrary,
 } from '../../../../packages/contracts/src/index';
 import { hasValidRescueLibraryIntegrity } from './library';
+import { findMissingRescueLocalizationKeys } from './localization';
 
 export interface RescueLibraryRepository {
   getActiveLibrary(): Promise<RescueLibrary>;
@@ -14,6 +15,12 @@ function cloneLibrary(library: RescueLibrary): RescueLibrary {
   return RescueLibrarySchema.parse(structuredClone(library));
 }
 
+function assertLocalizationBaseline(library: RescueLibrary): void {
+  if (findMissingRescueLocalizationKeys(library).length > 0) {
+    throw new Error('rescue_library_localization_error');
+  }
+}
+
 export class MemoryRescueLibraryRepository implements RescueLibraryRepository {
   private readonly libraries = new Map<number, RescueLibrary>();
   private activeVersion: number;
@@ -23,6 +30,7 @@ export class MemoryRescueLibraryRepository implements RescueLibraryRepository {
     if (!hasValidRescueLibraryIntegrity(parsed)) {
       throw new Error('rescue_library_integrity_error');
     }
+    assertLocalizationBaseline(parsed);
     this.activeVersion = parsed.contentVersion;
     this.libraries.set(parsed.contentVersion, cloneLibrary(parsed));
   }
@@ -49,6 +57,7 @@ export class MemoryRescueLibraryRepository implements RescueLibraryRepository {
     if (!hasValidRescueLibraryIntegrity(parsed)) {
       throw new Error('rescue_library_integrity_error');
     }
+    assertLocalizationBaseline(parsed);
 
     const active = this.libraries.get(this.activeVersion);
     if (!active) throw new Error('rescue_library_missing');
