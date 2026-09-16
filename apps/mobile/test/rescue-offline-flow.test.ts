@@ -25,6 +25,7 @@ const context: RescueContext = {
   deviceId: '550e8400-e29b-41d4-a716-446655440002',
   startedAt: '2026-09-16T05:10:00.000Z',
   goalType: 'smoke_free',
+  goalId: '550e8400-e29b-41d4-a716-446655440030',
   canMoveEnvironment: true,
   canContactSupport: true,
 };
@@ -256,9 +257,10 @@ describe('offline Rescue vertical flow', () => {
 
     const historyBeforeUse = await eventStore.listPending(20);
     const goalBeforeUse = rescue.snapshot().context.goalType;
+    const goalIdBeforeUse = rescue.snapshot().context.goalId;
     expect(rescue.reportUse('2026-09-16T06:01:05.000Z')).toMatchObject({
       state: 'recovery',
-      context: { goalType: goalBeforeUse },
+      context: { goalType: goalBeforeUse, goalId: goalIdBeforeUse },
     });
     await sink.productUse({
       userId: context.userId,
@@ -300,13 +302,16 @@ describe('offline Rescue vertical flow', () => {
     });
     expect(rescue.reassess({ wantsAnother: false, outcome: { productUseOutcome: 'use' } }, '2026-09-16T06:02:08.000Z')).toMatchObject({
       state: 'resolved',
-      context: { goalType: goalBeforeUse },
+      context: { goalType: goalBeforeUse, goalId: goalIdBeforeUse },
     });
 
     const eventsAfterRecovery = await eventStore.listPending(20);
     expect(eventsAfterRecovery.slice(0, historyBeforeUse.length)).toEqual(historyBeforeUse);
     expect(eventsAfterRecovery.some((event) => event.eventType === 'goal_changed')).toBe(false);
     expect(JSON.stringify(eventsAfterRecovery)).not.toMatch(/\b(failed|relapse)\b/i);
-    expect(sessionStore.get(rescue.snapshot().rescueSessionId)?.context.goalType).toBe(goalBeforeUse);
+    expect(sessionStore.get(rescue.snapshot().rescueSessionId)?.context).toMatchObject({
+      goalType: goalBeforeUse,
+      goalId: goalIdBeforeUse,
+    });
   });
 });
