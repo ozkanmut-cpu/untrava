@@ -54,12 +54,14 @@ export const InterventionEligibilitySchema = z.object({
   allowedGoalTypes: z.array(GoalTypeSchema).min(1).optional(),
 });
 
-export const InterventionSafetyMetadataSchema = z.object({
-  medicationAdvice: z.literal(false),
-  requiresHumanSupport: z.boolean().optional(),
-  avoidWhen: z.array(z.string().min(1)).optional(),
-  escalationMessageKey: z.string().min(1).optional(),
-});
+export const InterventionSafetyMetadataSchema = z
+  .object({
+    medicationAdvice: z.literal(false),
+    requiresHumanSupport: z.boolean().optional(),
+    avoidWhen: z.array(z.string().min(1)).optional(),
+    escalationMessageKey: z.string().min(1).optional(),
+  })
+  .strict();
 
 export const InterventionOutcomePromptSchema = z.object({
   promptId: z.string().min(1),
