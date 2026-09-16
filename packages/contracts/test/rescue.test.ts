@@ -60,6 +60,45 @@ describe('RescueLibrarySchema', () => {
     expect(RescueLibrarySchema.safeParse(library([intervention({ offlineCapable: false })])).success).toBe(false);
   });
 
+  it('rejects medication and NRT control metadata or action kinds', () => {
+    expect(
+      RescueLibrarySchema.safeParse(
+        library([
+          intervention({
+            safety: { medicationAdvice: true },
+          }),
+        ]),
+      ).success,
+    ).toBe(false);
+
+    expect(
+      RescueLibrarySchema.safeParse(
+        library([
+          intervention({
+            safety: { medicationAdvice: false, nrtDoseMg: 21 },
+          }),
+        ]),
+      ).success,
+    ).toBe(false);
+
+    expect(
+      RescueLibrarySchema.safeParse(
+        library([
+          intervention({
+            steps: [
+              {
+                stepId: 'dose-nrt',
+                copyKey: 'rescue.micro_breathe.step.breathe',
+                actionKind: 'nrt_dosing',
+                skippable: true,
+              },
+            ],
+          }),
+        ]),
+      ).success,
+    ).toBe(false);
+  });
+
   it('rejects duplicate intervention id/version pairs', () => {
     expect(RescueLibrarySchema.safeParse(library([intervention(), intervention()])).success).toBe(false);
   });
