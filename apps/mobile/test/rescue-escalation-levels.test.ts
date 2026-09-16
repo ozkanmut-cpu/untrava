@@ -50,7 +50,10 @@ describe('Rescue escalation levels acceptance', () => {
       expect(selection.interventionId).toBe(expectedInterventionId);
       expect(definition?.level).toBe(level);
 
-      const [selectedAt, startedAt, completedAt, nextAt] = timestamps[index];
+      const times = timestamps[index];
+      if (!times) throw new Error(`missing_${level}_timestamps`);
+      const [selectedAt, startedAt, completedAt, nextAt] = times;
+
       expect(rescue.select(selection, selectedAt).state).toBe('intervention_selected');
       expect(rescue.beginSelected(startedAt).state).toBe('intervention_active');
       expect(rescue.completeIntervention(completedAt).state).toBe('reassessing');
