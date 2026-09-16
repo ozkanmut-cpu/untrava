@@ -1,13 +1,15 @@
 import { getOrCreateDeviceId, type KeyValueStore } from './device-identity';
 import type { LocalEventStore } from './local-event-store';
 import { RescueEventSinkAdapter } from './rescue/events';
-import { createBundledRescueLibrary } from './rescue/library';
 import { RescueSessionCoordinator } from './rescue/session';
-import { selectIntervention } from './rescue/selector';
 import {
   RescueSupportCoordinator,
   type SupportActionProvider,
 } from './rescue/support';
+import {
+  createBundledTobaccoRescueLibrary,
+  selectTobaccoIntervention,
+} from './tobacco/rescue';
 import type { SyncClient } from './sync/sync-client';
 import type { SyncQueue } from './sync/sync-queue';
 import { SyncWorker } from './sync/sync-worker';
@@ -17,8 +19,8 @@ export interface MobileFoundation {
 }
 
 export interface RescueFoundation {
-  library: ReturnType<typeof createBundledRescueLibrary>;
-  selectIntervention: typeof selectIntervention;
+  library: ReturnType<typeof createBundledTobaccoRescueLibrary>;
+  selectIntervention: typeof selectTobaccoIntervention;
   eventSink: RescueEventSinkAdapter;
   sessionCoordinator: typeof RescueSessionCoordinator;
   support: RescueSupportCoordinator;
@@ -39,8 +41,8 @@ export function createRescueFoundation(
   supportProvider?: SupportActionProvider,
 ): RescueFoundation {
   return {
-    library: createBundledRescueLibrary(),
-    selectIntervention,
+    library: createBundledTobaccoRescueLibrary(),
+    selectIntervention: selectTobaccoIntervention,
     eventSink: new RescueEventSinkAdapter(eventStore, createEventId, now),
     sessionCoordinator: RescueSessionCoordinator,
     support: new RescueSupportCoordinator(supportProvider),
