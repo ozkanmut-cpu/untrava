@@ -20,10 +20,18 @@ const forbiddenCoreTokens = [
   "'smoke_free'",
   "'tobacco_free'",
   "'nicotine_free'",
+  '/alcohol/',
+  '../alcohol',
+  'AlcoholGoalTypeSchema',
+  "'alcohol'",
+  "'observe_only'",
+  "'abstinence'",
+  "'alcohol_free_days'",
+  "'usage_limit'",
 ] as const;
 
 describe('Core import boundary', () => {
-  it('keeps Tobacco imports and domain literals out of Core source', () => {
+  it('keeps Tobacco and Alcohol imports and domain literals out of Core source', () => {
     const sources = import.meta.glob<string>('../src/core/*.ts', {
       eager: true,
       query: '?raw',
