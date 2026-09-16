@@ -10,10 +10,12 @@
     "src/db/**/*.ts",
     "src/sync/**/*.ts",
     "src/rescue/**/*.ts",
+    "src/tobacco/**/*.ts",
     "test/device-identity.test.ts",
     "test/local-event-store.test.ts",
     "test/database.test.ts",
     "test/sync-worker.test.ts",
-    "test/rescue-*.test.ts"
+    "test/rescue-*.test.ts",
+    "test/tobacco-*.test.ts"
   ]
 }
