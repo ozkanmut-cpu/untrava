@@ -4,6 +4,7 @@ export * from './ids';
 export * from './core/goals';
 export * from './core/events';
 export * from './alcohol/goals';
+export * from './alcohol/events';
 export * from './profile';
 export * from './events';
 export * from './consent';
