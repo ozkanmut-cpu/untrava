@@ -5,6 +5,7 @@ import {
   type RescueSession,
   type RescueSessionState,
 } from '../../../../packages/contracts/src/index';
+import type { RescueSessionStore } from './session-store';
 import type { InterventionSelection } from './selector';
 
 export interface StartRescueInput {
@@ -22,10 +23,13 @@ export interface ReassessInput {
 const terminalStates = new Set<RescueSessionState>(['resolved', 'abandoned']);
 
 export class RescueSessionCoordinator {
-  private constructor(private session: RescueSession) {}
+  private constructor(
+    private session: RescueSession,
+    private readonly store?: RescueSessionStore,
+  ) {}
 
-  static start(input: StartRescueInput): RescueSessionCoordinator {
-    return new RescueSessionCoordinator(
+  static start(input: StartRescueInput, store?: RescueSessionStore): RescueSessionCoordinator {
+    const coordinator = new RescueSessionCoordinator(
       RescueSessionSchema.parse({
         rescueSessionId: input.rescueSessionId,
         context: input.context,
@@ -37,15 +41,24 @@ export class RescueSessionCoordinator {
         startedAt: input.now,
         updatedAt: input.now,
       }),
+      store,
     );
+    coordinator.persist();
+    return coordinator;
   }
 
-  static resume(session: RescueSession): RescueSessionCoordinator {
-    return new RescueSessionCoordinator(RescueSessionSchema.parse(session));
+  static resume(session: RescueSession, store?: RescueSessionStore): RescueSessionCoordinator {
+    const coordinator = new RescueSessionCoordinator(RescueSessionSchema.parse(session), store);
+    coordinator.persist();
+    return coordinator;
   }
 
   snapshot(): RescueSession {
     return RescueSessionSchema.parse(structuredClone(this.session));
+  }
+
+  private persist(): void {
+    this.store?.save(this.snapshot());
   }
 
   private requireState(...allowed: RescueSessionState[]): void {
@@ -56,6 +69,7 @@ export class RescueSessionCoordinator {
 
   private transition(state: RescueSessionState, now: string): RescueSession {
     this.session = RescueSessionSchema.parse({ ...this.session, state, updatedAt: now });
+    this.persist();
     return this.snapshot();
   }
 
@@ -74,6 +88,7 @@ export class RescueSessionCoordinator {
       currentStepIndex: 0,
       updatedAt: now,
     });
+    this.persist();
     return this.snapshot();
   }
 
@@ -95,6 +110,7 @@ export class RescueSessionCoordinator {
       state: input.wantsAnother ? 'escalating' : 'resolved',
       updatedAt: now,
     });
+    this.persist();
     return this.snapshot();
   }
 
