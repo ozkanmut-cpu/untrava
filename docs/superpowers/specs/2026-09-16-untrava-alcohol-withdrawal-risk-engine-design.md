@@ -157,7 +157,7 @@ type AlcoholChangeIntent =
 
 `reduce` and `abstain` can expose withdrawal risk and therefore require adequate evidence before the app encourages a major change.
 
-`unknown` must not be silently interpreted as low risk.
+`unknown` must not be silently interpreted as low risk. For permissioning purposes V1 treats `unknown` conservatively like a change intent: it cannot unlock app-guided major reduction/abstinence when critical evidence is missing.
 
 ## 8. Withdrawal-risk evidence domains
 
@@ -212,7 +212,20 @@ Broad interaction details, pregnancy policy and Wernicke-risk logic remain owned
 
 Completeness is **computed**, not trusted as a caller-supplied boolean.
 
-The versioned policy defines which evidence keys are critical for each change intent.
+The V1 policy defines the following critical evidence keys for `reduce`, `abstain` and permission-sensitive `unknown` intent:
+
+- `currentSeizure`;
+- `severeConfusionOrDisorientation`;
+- `withdrawalSymptomsAfterReduction`;
+- `previousWithdrawalSeizure`;
+- `previousWithdrawalDelirium`;
+- `longDurationHeavyRegularUse`;
+- `morningDrinkingOrReliefDrinking`;
+- `priorWithdrawalSymptomsWhenCuttingDownOrStopping`;
+- `sedativeHypnoticPhysiologicalDependence`;
+- `epilepsy`;
+- `significantUnstableMedicalIllness`;
+- `significantActivePsychiatricIllnessOrCognitiveImpairment`.
 
 Conceptual behavior:
 
@@ -220,8 +233,8 @@ Conceptual behavior:
 observe
 → incomplete withdrawal assessment may still allow logging/observation
 
-reduce / abstain
-→ required safety evidence unknown
+reduce / abstain / permission-sensitive unknown intent
+→ any required safety evidence unknown
 → fail safe; do not provide app-guided major reduction/abstinence instructions
 ```
 
@@ -322,6 +335,56 @@ Lower-severity evidence can never downgrade a higher-severity disposition.
 
 A favorable consumption pattern, current calmness or AI-generated reassurance cannot cancel a prior withdrawal seizure, withdrawal delirium or other policy-defined blocking evidence.
 
+### 12.1 Frozen V1 policy table
+
+The initial rule set is intentionally conservative and explicit.
+
+**Emergency — any one present:**
+
+- `currentSeizure`;
+- `severeConfusionOrDisorientation`.
+
+Result: `emergency_response` for every change intent, including `observe`.
+
+**Urgent — any one present, unless Emergency already matched:**
+
+- `markedAutonomicSymptoms`;
+- `significantPerceptualDisturbance`.
+
+Result: `urgent_medical_assessment` for every change intent, including `observe`.
+
+**Medical assessment before app-guided major reduction/abstinence — any one present, unless a higher precedence matched:**
+
+- `withdrawalSymptomsAfterReduction`;
+- `previousWithdrawalSeizure`;
+- `previousWithdrawalDelirium`;
+- `previousSevereWithdrawal`;
+- `repeatedWithdrawalEpisodes`;
+- `priorMedicallyAssistedWithdrawalComplication`;
+- `longDurationHeavyRegularUse`;
+- `morningDrinkingOrReliefDrinking`;
+- `priorWithdrawalSymptomsWhenCuttingDownOrStopping`;
+- `sedativeHypnoticPhysiologicalDependence`;
+- `epilepsy`;
+- `significantUnstableMedicalIllness`;
+- `significantActivePsychiatricIllnessOrCognitiveImpairment`.
+
+For `reduce`, `abstain`, or permission-sensitive `unknown` intent, result: `medical_assessment_advised`.
+
+For `observe`, these historical/co-risk items do not block factual logging or observation. They are preserved as evidence and must be re-evaluated if the user later enters a reduction/abstinence action. This preserves progressive, non-medicalized onboarding without weakening safety at the point where withdrawal risk becomes actionable.
+
+**Critical missing data:**
+
+For `reduce`, `abstain`, or permission-sensitive `unknown` intent, if any critical evidence key listed in section 9 remains `unknown` after the required assessment opportunity, result: `medical_assessment_advised` with `insufficient.required_evidence_unknown` and the exact missing keys.
+
+For `observe`, missing historical risk evidence does not by itself block logging. Emergency/urgent current-symptom evidence is still evaluated whenever supplied.
+
+**Allow ordinary behavior-change support:**
+
+Only when no higher-precedence rule matches and the applicable critical evidence is complete enough for the requested change intent does the engine return `behavior_change_support_allowed`.
+
+This disposition remains a product-permission result, never a medical clearance statement.
+
 ## 13. Reason codes
 
 Every non-trivial decision must be explainable through stable machine-readable reason codes.
@@ -331,16 +394,20 @@ Initial conceptual families:
 ```text
 emergency.current_seizure
 emergency.severe_confusion
-urgent.active_withdrawal_concern
+urgent.marked_autonomic_symptoms
+urgent.significant_perceptual_disturbance
 history.previous_withdrawal_seizure
 history.previous_withdrawal_delirium
 history.repeated_withdrawal
 history.previous_severe_withdrawal
+history.prior_assisted_withdrawal_complication
+risk.withdrawal_symptoms_after_reduction
 risk.sedative_hypnotic_dependence
 risk.epilepsy
 risk.unstable_medical_illness
 risk.active_psychiatric_or_cognitive_concern
 risk.heavy_regular_use_pattern
+risk.morning_or_relief_drinking
 risk.prior_symptoms_on_reduction
 insufficient.required_evidence_unknown
 ```
@@ -502,22 +569,25 @@ Required test groups:
 
 ### 21.3 Urgent routing
 
-- policy-defined serious active-withdrawal concern → `urgent_medical_assessment`;
+- marked autonomic symptoms → `urgent_medical_assessment`;
+- significant perceptual disturbance → `urgent_medical_assessment`;
 - urgent routing outranks historical-only assessment routing.
 
-### 21.4 Historical high-risk routing
+### 21.4 Historical/high-risk routing
 
-- previous withdrawal seizure → at least `medical_assessment_advised` for reduction/abstinence;
-- previous withdrawal delirium → at least `medical_assessment_advised`;
-- policy-defined multi-risk combinations route conservatively;
-- sedative-hypnotic physiological dependence cannot be overridden by low alcohol quantity.
+- previous withdrawal seizure → `medical_assessment_advised` for reduction/abstinence;
+- previous withdrawal delirium → `medical_assessment_advised` for reduction/abstinence;
+- each V1 blocking evidence key is covered by a direct routing test;
+- sedative-hypnotic physiological dependence cannot be overridden by low alcohol quantity;
+- the same historical evidence does not prevent `observe` logging in the absence of current urgent/emergency signals.
 
 ### 21.5 Missing-data fail-safe
 
-- critical unknowns + `abstain` → no ordinary app-guided abstinence permission;
-- critical unknowns + `reduce` → no ordinary app-guided major-reduction permission;
+- any critical unknown + `abstain` → no ordinary app-guided abstinence permission;
+- any critical unknown + `reduce` → no ordinary app-guided major-reduction permission;
 - incomplete evidence + `observe` can retain safe observation/logging behavior;
-- `unknown` intent is not interpreted as low risk.
+- `unknown` intent cannot unlock change guidance with missing critical evidence;
+- exact missing keys are included in `unknownCriticalEvidenceKeys`.
 
 ### 21.6 Determinism/versioning
 
@@ -540,11 +610,11 @@ Roadmap item #33 is complete only when all of the following are true:
 1. Withdrawal risk is implemented as an Alcohol-owned deterministic safety gate separate from Rescue.
 2. Evidence distinguishes present/absent/unknown.
 3. The gate is versioned and auditable.
-4. Emergency evidence has explicit highest precedence.
-5. Serious active-withdrawal concern has urgent routing.
-6. Prior seizure/delirium and other configured major risks prevent permissive self-guided reduction/abstinence routing.
-7. Critical missing evidence fails safe for reduction/abstinence.
-8. Observation/logging is not unnecessarily blocked by an incomplete withdrawal assessment.
+4. Current seizure and severe confusion/disorientation have explicit emergency precedence.
+5. Marked autonomic symptoms and significant perceptual disturbance have explicit urgent precedence in V1.
+6. Each frozen V1 blocking evidence item routes reduction/abstinence to `medical_assessment_advised` unless a higher-precedence rule matched.
+7. Critical missing evidence fails safe for reduction/abstinence and permission-sensitive unknown intent.
+8. Observation/logging is not unnecessarily blocked by historical/missing withdrawal-risk evidence in the absence of current urgent/emergency signals.
 9. No alcohol quantity threshold by itself provides detox clearance.
 10. PAWSS is not used as sole consumer detox permission.
 11. CIWA-Ar is not used as a pre-cessation clearance mechanism.
