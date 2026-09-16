@@ -11,6 +11,8 @@ export interface InterventionSelection {
   reasonCodes: string[];
 }
 
+export type RescueSelectionMode = 'rescue' | 'recovery';
+
 const levelRank: Record<RescueLevel, number> = {
   micro: 0,
   guided: 1,
@@ -25,9 +27,15 @@ const burdenRank: Record<InterventionDefinition['burden'], number> = {
   high: 3,
 };
 
-function eligible(item: InterventionDefinition, context: RescueContext): boolean {
+function eligible(
+  item: InterventionDefinition,
+  context: RescueContext,
+  mode: RescueSelectionMode,
+): boolean {
   if (item.status !== 'active') return false;
+  if (mode === 'recovery' && !item.recoveryEligible) return false;
   if (context.disabledInterventionIds?.includes(item.interventionId)) return false;
+  if (item.eligibility.allowedGoalTypes && !item.eligibility.allowedGoalTypes.includes(context.goalType)) return false;
   if (item.eligibility.requiresEnvironmentMove && context.canMoveEnvironment === false) return false;
   if (item.eligibility.requiresAudio && context.canUseAudio === false) return false;
   if ((item.eligibility.requiresSupport || item.safety.requiresHumanSupport) && context.canContactSupport === false) {
@@ -40,10 +48,11 @@ export function selectIntervention(
   library: RescueLibrary,
   context: RescueContext,
   minimumLevel: RescueLevel = 'micro',
+  mode: RescueSelectionMode = 'rescue',
 ): InterventionSelection | null {
   const minimumRank = levelRank[minimumLevel];
   const candidates = library.interventions
-    .filter((item) => eligible(item, context) && levelRank[item.level] >= minimumRank)
+    .filter((item) => eligible(item, context, mode) && levelRank[item.level] >= minimumRank)
     .sort((left, right) => {
       const leftDeclined = context.recentlyDeclinedInterventionIds?.includes(left.interventionId) ? 1 : 0;
       const rightDeclined = context.recentlyDeclinedInterventionIds?.includes(right.interventionId) ? 1 : 0;
@@ -69,6 +78,7 @@ export function selectIntervention(
   const reasonCodes = ['lowest_burden_eligible'];
   if (context.preferredInterventionIds?.includes(selected.interventionId)) reasonCodes.push('user_preferred');
   if (minimumLevel !== 'micro') reasonCodes.push(`minimum_level:${minimumLevel}`);
+  if (mode === 'recovery') reasonCodes.push('recovery_mode');
 
   return {
     interventionId: selected.interventionId,
