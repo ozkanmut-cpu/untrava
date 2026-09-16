@@ -13,6 +13,25 @@ export interface InterventionSelection {
 
 export type RescueSelectionMode = 'rescue' | 'recovery';
 
+export const MINIMAL_STABILIZATION_FALLBACK = {
+  interventionId: 'minimal-stabilization-fallback',
+  version: 1,
+  level: 'micro',
+  estimatedSeconds: 60,
+  title: 'One quiet minute',
+  summary: 'Use one simple offline step while Rescue resets.',
+  steps: [
+    {
+      stepId: 'minimal-stabilization-fallback-step-1',
+      instruction: 'Breathe slowly and give the urge one minute before deciding what to do next.',
+      durationSeconds: 60,
+    },
+  ],
+  safety: {
+    medicationAdvice: false,
+  },
+} as const;
+
 const levelRank: Record<RescueLevel, number> = {
   micro: 0,
   guided: 1,
@@ -73,7 +92,16 @@ export function selectIntervention(
     });
 
   const selected = candidates[0];
-  if (!selected) return null;
+  if (!selected) {
+    if (mode === 'rescue' && minimumLevel === 'micro') {
+      return {
+        interventionId: MINIMAL_STABILIZATION_FALLBACK.interventionId,
+        version: MINIMAL_STABILIZATION_FALLBACK.version,
+        reasonCodes: ['hardcoded_minimal_fallback'],
+      };
+    }
+    return null;
+  }
 
   const reasonCodes = ['lowest_burden_eligible'];
   if (context.preferredInterventionIds?.includes(selected.interventionId)) reasonCodes.push('user_preferred');
