@@ -76,4 +76,50 @@ describe('RescueEventSinkAdapter', () => {
     expect(await store.get(original.eventId)).toEqual(original);
     expect(events[1]).toMatchObject({ eventType: 'product_use', payload: { product: 'cigarette', quantity: 1 } });
   });
+
+  it('appends correction and retraction events without mutating the targeted rescue event', async () => {
+    const db = new MemoryDatabase();
+    let index = 0;
+    const store = new LocalEventStore(db);
+    const sink = new RescueEventSinkAdapter(store, () => ids[index++]!, () => '2026-09-16T05:00:01.000Z');
+
+    await sink.interventionStarted({ ...base, reasonCodes: ['user_preferred'] });
+    const original = (await store.listPending(10))[0] as QuitEventEnvelope;
+
+    await sink.correction({
+      userId: base.userId,
+      deviceId: base.deviceId,
+      rescueSessionId: base.rescueSessionId,
+      targetEventId: original.eventId,
+      occurredAt: '2026-09-16T05:03:00.000Z',
+      correction: { reasonCodes: ['corrected_reason'] },
+    });
+    await sink.retraction({
+      userId: base.userId,
+      deviceId: base.deviceId,
+      rescueSessionId: base.rescueSessionId,
+      targetEventId: original.eventId,
+      occurredAt: '2026-09-16T05:04:00.000Z',
+    });
+
+    const events = await store.listPending(10);
+    expect(events).toHaveLength(3);
+    expect(await store.get(original.eventId)).toEqual(original);
+    expect(events[1]).toMatchObject({
+      eventType: 'correction',
+      payload: {
+        targetEventId: original.eventId,
+        rescueSessionId: base.rescueSessionId,
+        correction: { reasonCodes: ['corrected_reason'] },
+      },
+    });
+    expect(events[2]).toMatchObject({
+      eventType: 'retraction',
+      payload: {
+        targetEventId: original.eventId,
+        rescueSessionId: base.rescueSessionId,
+      },
+    });
+    expect(new Set(events.map((event) => event.eventId)).size).toBe(3);
+  });
 });
