@@ -5,10 +5,10 @@ describe('RescueOperationalLogger', () => {
   it('allows only low-risk metadata and never writes sensitive Rescue contents', () => {
     const entries: unknown[] = [];
     const logger = new RescueOperationalLogger({
-      info(entry) {
+      info(entry: unknown) {
         entries.push(entry);
       },
-      error(entry) {
+      error(entry: unknown) {
         entries.push(entry);
       },
     });
@@ -55,10 +55,10 @@ describe('RescueOperationalLogger', () => {
   it('drops unsafe values even when supplied through otherwise allowed keys', () => {
     const entries: unknown[] = [];
     const logger = new RescueOperationalLogger({
-      info(entry) {
+      info(entry: unknown) {
         entries.push(entry);
       },
-      error(entry) {
+      error(entry: unknown) {
         entries.push(entry);
       },
     });
