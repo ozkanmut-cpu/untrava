@@ -191,4 +191,122 @@ describe('offline Rescue vertical flow', () => {
     expect(sessionStore.get(second.snapshot().rescueSessionId)?.state).toBe('resolved');
     expect(offlineTransport.calls).toBe(0);
   });
+
+  it('preserves prior progress history and the current goal after a single product use', async () => {
+    const eventDb = new MemoryEventDatabase();
+    const eventStore = new LocalEventStore(eventDb);
+    const sessionStore = new MemoryRescueSessionStore();
+    let eventIndex = 0;
+    const sink = new RescueEventSinkAdapter(
+      eventStore,
+      () => eventIds[eventIndex++]!,
+      () => '2026-09-16T06:00:01.000Z',
+    );
+    const library = createBundledRescueLibrary();
+    const selection = selectIntervention(library, context);
+    if (!selection) throw new Error('expected rescue selection');
+    const definition = library.interventions.find((item) => item.interventionId === selection.interventionId);
+    if (!definition) throw new Error('missing rescue intervention');
+
+    const rescue = RescueSessionCoordinator.start(
+      {
+        rescueSessionId: '550e8400-e29b-41d4-a716-446655440023',
+        context,
+        libraryContentVersion: library.contentVersion,
+        now: '2026-09-16T06:00:00.000Z',
+      },
+      sessionStore,
+    );
+    rescue.stabilize('2026-09-16T06:00:01.000Z');
+    rescue.select(selection, '2026-09-16T06:00:02.000Z');
+    rescue.beginSelected('2026-09-16T06:00:03.000Z');
+    await sink.interventionStarted({
+      userId: context.userId,
+      deviceId: context.deviceId,
+      rescueSessionId: rescue.snapshot().rescueSessionId,
+      interventionId: selection.interventionId,
+      interventionVersion: selection.version,
+      rescueLevel: definition.level,
+      libraryContentVersion: library.contentVersion,
+      occurredAt: '2026-09-16T06:00:03.000Z',
+      reasonCodes: selection.reasonCodes,
+    });
+    rescue.completeIntervention('2026-09-16T06:01:03.000Z');
+    await sink.interventionCompleted({
+      userId: context.userId,
+      deviceId: context.deviceId,
+      rescueSessionId: rescue.snapshot().rescueSessionId,
+      interventionId: selection.interventionId,
+      interventionVersion: selection.version,
+      rescueLevel: definition.level,
+      libraryContentVersion: library.contentVersion,
+      occurredAt: '2026-09-16T06:01:03.000Z',
+    });
+    await sink.interventionOutcome({
+      userId: context.userId,
+      deviceId: context.deviceId,
+      rescueSessionId: rescue.snapshot().rescueSessionId,
+      interventionId: selection.interventionId,
+      interventionVersion: selection.version,
+      rescueLevel: definition.level,
+      libraryContentVersion: library.contentVersion,
+      occurredAt: '2026-09-16T06:01:04.000Z',
+      outcome: { cravingBefore: 7, cravingAfter: 5, productUseOutcome: 'no_use' },
+    });
+
+    const historyBeforeUse = await eventStore.listPending(20);
+    const goalBeforeUse = rescue.snapshot().context.goalType;
+    expect(rescue.reportUse('2026-09-16T06:01:05.000Z')).toMatchObject({
+      state: 'recovery',
+      context: { goalType: goalBeforeUse },
+    });
+    await sink.productUse({
+      userId: context.userId,
+      deviceId: context.deviceId,
+      rescueSessionId: rescue.snapshot().rescueSessionId,
+      product: 'cigarette',
+      quantity: 1,
+      occurredAt: '2026-09-16T06:01:05.000Z',
+    });
+
+    const recoveryDefinition = library.interventions.find((item) => item.status === 'active' && item.recoveryEligible);
+    if (!recoveryDefinition) throw new Error('missing recovery intervention');
+    rescue.select(
+      { interventionId: recoveryDefinition.interventionId, version: recoveryDefinition.version, reasonCodes: ['recovery'] },
+      '2026-09-16T06:01:06.000Z',
+    );
+    rescue.beginSelected('2026-09-16T06:01:07.000Z');
+    await sink.interventionStarted({
+      userId: context.userId,
+      deviceId: context.deviceId,
+      rescueSessionId: rescue.snapshot().rescueSessionId,
+      interventionId: recoveryDefinition.interventionId,
+      interventionVersion: recoveryDefinition.version,
+      rescueLevel: recoveryDefinition.level,
+      libraryContentVersion: library.contentVersion,
+      occurredAt: '2026-09-16T06:01:07.000Z',
+      reasonCodes: ['recovery'],
+    });
+    rescue.completeIntervention('2026-09-16T06:02:07.000Z');
+    await sink.interventionCompleted({
+      userId: context.userId,
+      deviceId: context.deviceId,
+      rescueSessionId: rescue.snapshot().rescueSessionId,
+      interventionId: recoveryDefinition.interventionId,
+      interventionVersion: recoveryDefinition.version,
+      rescueLevel: recoveryDefinition.level,
+      libraryContentVersion: library.contentVersion,
+      occurredAt: '2026-09-16T06:02:07.000Z',
+    });
+    expect(rescue.reassess({ wantsAnother: false, outcome: { productUseOutcome: 'use' } }, '2026-09-16T06:02:08.000Z')).toMatchObject({
+      state: 'resolved',
+      context: { goalType: goalBeforeUse },
+    });
+
+    const eventsAfterRecovery = await eventStore.listPending(20);
+    expect(eventsAfterRecovery.slice(0, historyBeforeUse.length)).toEqual(historyBeforeUse);
+    expect(eventsAfterRecovery.some((event) => event.eventType === 'goal_changed')).toBe(false);
+    expect(JSON.stringify(eventsAfterRecovery)).not.toMatch(/\b(failed|relapse)\b/i);
+    expect(sessionStore.get(rescue.snapshot().rescueSessionId)?.context.goalType).toBe(goalBeforeUse);
+  });
 });
