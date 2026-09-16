@@ -84,24 +84,61 @@ Interpretation:
 
 The engine should begin with the lowest-burden eligible option unless context or user choice requires otherwise.
 
-### 4.2 Intervention family
+### 4.2 Intervention family and structured rule types
 
-Initial families:
+```ts
+export type InterventionFamily =
+  | 'act'
+  | 'cbt'
+  | 'behavioral_coping'
+  | 'mindfulness_regulation'
+  | 'environment_change'
+  | 'human_support';
 
-- `act`
-- `cbt`
-- `behavioral_coping`
-- `mindfulness_regulation`
-- `environment_change`
-- `human_support`
+export type InterventionActionKind =
+  | 'instruction'
+  | 'timer'
+  | 'breathing'
+  | 'movement'
+  | 'environment_change'
+  | 'reflection'
+  | 'delay'
+  | 'support_action';
 
-These families are classification metadata. The engine selects a specific intervention, not merely a family.
+export interface InterventionStep {
+  stepId: string;
+  copyKey: string;
+  actionKind: InterventionActionKind;
+  durationSeconds?: number;
+  skippable: boolean;
+  accessibilityLabelKey?: string;
+}
+
+export interface InterventionEligibility {
+  requiresMovement?: boolean;
+  requiresAudio?: boolean;
+  requiresSupport?: boolean;
+  allowedGoalTypes?: Array<'smoke_free' | 'tobacco_free' | 'nicotine_free' | 'reduction'>;
+}
+
+export interface InterventionOutcomePrompt {
+  field:
+    | 'craving_after'
+    | 'delay_minutes'
+    | 'environment_changed'
+    | 'exercise_completed'
+    | 'support_requested'
+    | 'product_use_outcome'
+    | 'helpful_rating';
+  required: false;
+}
+```
+
+These are classification and structured-rule types. The library never contains executable arbitrary code; engine code interprets these fields deterministically.
 
 ### 4.3 Intervention definition
 
 Each intervention is editorially approved and versioned.
-
-Required fields:
 
 ```ts
 export interface InterventionDefinition {
@@ -116,6 +153,7 @@ export interface InterventionDefinition {
   estimatedSeconds: number;
   burden: 'very_low' | 'low' | 'medium' | 'high';
   offlineCapable: true;
+  recoveryEligible: boolean;
   eligibility: InterventionEligibility;
   safety: InterventionSafetyMetadata;
   outcomePrompts: InterventionOutcomePrompt[];
@@ -123,22 +161,7 @@ export interface InterventionDefinition {
 }
 ```
 
-The library must not contain executable arbitrary code. Rules are structured data interpreted by deterministic engine code.
-
-### 4.4 Intervention step
-
-A step may request a simple user action such as breathing/regulation, urge-surfing, delay, walking, changing room/location, removing immediate access to the product, drinking water, a short cognitive reframing prompt or contacting support.
-
-A step definition should include:
-
-- stable step ID;
-- localized copy key;
-- optional duration/timer;
-- action kind;
-- skippable flag;
-- accessibility metadata where relevant.
-
-The content model must support localization without changing clinical/behavioral meaning.
+Recovery actions use this same definition format and set `recoveryEligible: true`; there is no parallel recovery-content model.
 
 ## 5. Rescue context
 
@@ -179,12 +202,13 @@ Examples of eligibility constraints:
 - requires ability to move environment;
 - requires audio availability;
 - requires support action availability;
+- goal type is outside `allowedGoalTypes`;
 - user has explicitly disabled a method;
 - intervention is retired in the active library version.
 
 ### 6.2 Safety metadata
 
-Safety metadata is versioned and auditable. Initial fields may include:
+Safety metadata is versioned and auditable.
 
 ```ts
 export interface InterventionSafetyMetadata {
@@ -206,11 +230,12 @@ The first selector is deliberately simple and reproducible.
 Selection order:
 
 1. filter active and eligible definitions;
-2. prefer lowest suitable Rescue level;
-3. prefer explicitly user-favored interventions;
-4. down-rank recently declined items;
-5. avoid immediate repetition of a just-completed item when alternatives exist;
-6. use stable deterministic tie-breaking, e.g. intervention ID/version order.
+2. when in Recovery Flow, require `recoveryEligible: true`;
+3. prefer lowest suitable Rescue level;
+4. prefer explicitly user-favored interventions;
+5. down-rank recently declined items;
+6. avoid immediate repetition of a just-completed item when alternatives exist;
+7. use stable deterministic tie-breaking, e.g. intervention ID/version order.
 
 The selector returns:
 
@@ -280,8 +305,6 @@ Skipping levels is allowed when required by eligibility/context or explicitly se
 
 A Rescue session does not define success only as abstinence.
 
-Outcome fields may include:
-
 ```ts
 export interface RescueOutcome {
   cravingBefore?: number;
@@ -331,19 +354,27 @@ Recovery Flow is short:
 
 1. record the product-use event;
 2. optionally capture minimal context;
-3. offer one immediate recovery action;
+3. select one eligible intervention from the same Rescue Library with `recoveryEligible: true`;
 4. allow the user to return to their current goal without silently changing strategy;
 5. preserve prior progress and savings data.
 
 A single use does not automatically change a goal to failed or relapse. Higher-level lapse/relapse interpretation belongs to later intelligence/product logic.
-
-The recovery action itself may be a versioned intervention with `recoveryEligible: true` or a dedicated recovery definition using the same library format.
 
 ## 13. Human support interface
 
 Support Circle is not implemented in this milestone. Rescue therefore depends only on an abstract interface:
 
 ```ts
+export interface SupportActionRequest {
+  rescueSessionId: string;
+  requestedAt: string;
+  reason: 'user_requested' | 'rescue_escalation';
+}
+
+export interface SupportActionResult {
+  status: 'offered' | 'started' | 'cancelled' | 'unavailable';
+}
+
 export interface SupportActionProvider {
   canOfferSupport(): Promise<boolean>;
   requestUserInitiatedSupport(input: SupportActionRequest): Promise<SupportActionResult>;
@@ -353,15 +384,14 @@ export interface SupportActionProvider {
 Rules:
 
 - support is user-initiated by default;
+- `rescue_escalation` means the app offers the action; it still does not send a message without user action;
 - no automatic message is sent merely because Rescue escalated;
 - no contact data is embedded in the Rescue library;
-- if no provider is configured, human-support interventions are filtered out or replaced with a generic user-controlled contact option supported by the host platform.
+- if no provider is configured, human-support interventions are filtered out or replaced with a generic user-controlled host-platform contact option.
 
 ## 14. Versioned Local Rescue Library
 
 The app ships with a default library bundle.
-
-Library envelope:
 
 ```ts
 export interface RescueLibrary {
@@ -427,7 +457,7 @@ Minimum functional set:
 - one behavioral delay/substitution exercise;
 - one environment-change intervention;
 - one human-support action;
-- one Recovery Flow action.
+- one Recovery Flow intervention with `recoveryEligible: true`.
 
 Content copy should be neutral, concise and non-shaming. Exact final evidence/editorial wording can be expanded later without changing the engine contract.
 
@@ -468,8 +498,10 @@ Rescue should fail soft where possible.
 - AI unavailable: no effect on core Rescue.
 - Downloaded library invalid: use last known valid/bundled library.
 - Preferred intervention ineligible: select next eligible candidate.
-- No eligible intervention: fall back to a built-in minimal stabilization/recovery-safe action and user-controlled support options.
+- No eligible intervention: use a bundled, hard-coded minimal stabilization fallback that contains no medical/treatment advice, then expose user-controlled support options if available.
 - Local persistence failure: surface a clear non-shaming error and do not falsely claim the Rescue history was saved.
+
+The minimal fallback is application code/content shipped with the client, not remotely supplied content, so a corrupt downloaded library cannot remove core Rescue capability.
 
 ## 20. Privacy and logging
 
@@ -495,7 +527,8 @@ Test-driven implementation is required.
 - duplicate active intervention rejected;
 - deterministic selector stability;
 - eligibility filtering;
-- retired definitions excluded from new selections.
+- retired definitions excluded from new selections;
+- recovery mode only selects `recoveryEligible` definitions.
 
 ### State-machine tests
 
@@ -544,7 +577,8 @@ The `untrava-rescue-interventions` milestone is complete only when all of the fo
 - four escalation levels are representable and transitions are explicit;
 - reassessment can resolve, escalate, request support or enter Recovery Flow;
 - product use during/after Rescue creates an immutable product-use event and does not rewrite prior events;
-- recovery is non-punitive and does not silently change the user's goal;
+- Recovery Flow uses the same versioned intervention model and cannot silently change the user's goal;
+- recovery is non-punitive;
 - Rescue outcome facts are persisted for later learning without claiming causal efficacy;
 - invalid downloaded library updates fail closed to the previous valid library;
 - running sessions remain pinned to the intervention version they started with;
