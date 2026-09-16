@@ -3,5 +3,15 @@
   "compilerOptions": {
     "types": ["vitest/globals"]
   },
-  "include": ["src/device-identity.ts", "src/foundation.ts", "src/local-event-store.ts", "src/db/**/*.ts", "test/device-identity.test.ts", "test/local-event-store.test.ts", "test/database.test.ts"]
+  "include": [
+    "src/device-identity.ts",
+    "src/foundation.ts",
+    "src/local-event-store.ts",
+    "src/db/**/*.ts",
+    "src/sync/**/*.ts",
+    "test/device-identity.test.ts",
+    "test/local-event-store.test.ts",
+    "test/database.test.ts",
+    "test/sync-worker.test.ts"
+  ]
 }

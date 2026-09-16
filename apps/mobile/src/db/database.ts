@@ -11,6 +11,11 @@ export interface SQLiteDatabase {
   getAllAsync<T extends SQLiteResultRow>(source: string, ...params: (string | number | null)[]): Promise<T[]>;
 }
 
+export interface SyncEventDatabase extends LocalEventDatabase {
+  listDue(now: string, limit: number): Promise<LocalEventRow[]>;
+  markFailed(eventId: string, attemptCount: number, nextAttemptAt: string): Promise<void>;
+}
+
 type EventSqlRow = SQLiteResultRow & {
   event_id: string;
   envelope: string;
@@ -44,7 +49,7 @@ function toLocalEventRow(row: EventSqlRow): LocalEventRow {
   };
 }
 
-export class SQLiteLocalEventDatabase implements LocalEventDatabase {
+export class SQLiteLocalEventDatabase implements SyncEventDatabase {
   private initialized = false;
 
   constructor(private readonly database: SQLiteDatabase) {}
@@ -89,6 +94,21 @@ export class SQLiteLocalEventDatabase implements LocalEventDatabase {
     return rows.map(toLocalEventRow);
   }
 
+  async listDue(now: string, limit: number): Promise<LocalEventRow[]> {
+    await this.initialize();
+    const rows = await this.database.getAllAsync<EventSqlRow>(
+      `SELECT event_id, envelope, sync_state, attempt_count, next_attempt_at, synced_at
+       FROM quit_events_local
+       WHERE sync_state = 'pending'
+         AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+       ORDER BY rowid ASC
+       LIMIT ?`,
+      now,
+      limit,
+    );
+    return rows.map(toLocalEventRow);
+  }
+
   async markSynced(eventId: string, syncedAt: string): Promise<void> {
     await this.initialize();
     await this.database.runAsync(
@@ -96,6 +116,18 @@ export class SQLiteLocalEventDatabase implements LocalEventDatabase {
        SET sync_state = 'synced', synced_at = ?, next_attempt_at = NULL
        WHERE event_id = ?`,
       syncedAt,
+      eventId,
+    );
+  }
+
+  async markFailed(eventId: string, attemptCount: number, nextAttemptAt: string): Promise<void> {
+    await this.initialize();
+    await this.database.runAsync(
+      `UPDATE quit_events_local
+       SET sync_state = 'pending', attempt_count = ?, next_attempt_at = ?, synced_at = NULL
+       WHERE event_id = ?`,
+      attemptCount,
+      nextAttemptAt,
       eventId,
     );
   }

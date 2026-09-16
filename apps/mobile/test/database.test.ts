@@ -61,4 +61,13 @@ describe('SQLiteLocalEventDatabase', () => {
     expect(sqlite.runCalls.at(-1)?.source).toContain("SET sync_state = 'synced'");
     expect(sqlite.runCalls.at(-1)?.params).toEqual(['2026-09-16T00:10:00.000Z', 'event-1']);
   });
+
+  it('keeps a transport failure pending while persisting retry metadata', async () => {
+    const sqlite = new FakeSQLite();
+    const database = new SQLiteLocalEventDatabase(sqlite);
+    await database.markFailed('event-1', 3, '2026-09-16T00:15:00.000Z');
+    expect(sqlite.runCalls.at(-1)?.source).toContain("SET sync_state = 'pending'");
+    expect(sqlite.runCalls.at(-1)?.source).toContain('attempt_count = ?');
+    expect(sqlite.runCalls.at(-1)?.params).toEqual([3, '2026-09-16T00:15:00.000Z', 'event-1']);
+  });
 });
