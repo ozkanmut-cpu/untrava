@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ALCOHOL_WITHDRAWAL_RISK_POLICY_V1 } from '../src/alcohol/safety/policy';
 
 declare global {
   interface ImportMeta {
@@ -126,5 +127,49 @@ describe('evaluateWithdrawalRisk', () => {
   it('is deterministic for the same evidence, policy and timestamp', () => {
     const evidence = baseEvidence('abstain');
     expect(evaluator()(evidence, decidedAt)).toEqual(evaluator()(evidence, decidedAt));
+  });
+
+  it('fails closed when the supplied policy is tampered', () => {
+    const tamperedPolicy = {
+      ...ALCOHOL_WITHDRAWAL_RISK_POLICY_V1,
+      assessmentEvidenceKeys: ['longDurationHeavyRegularUse'],
+    };
+    const decision = evaluator()(baseEvidence('abstain'), decidedAt, tamperedPolicy);
+    expect(decision.disposition).toBe('medical_assessment_advised');
+    expect(decision.reasonCodes).toEqual(['system.invalid_rule_set']);
+  });
+
+  it('preserves hard emergency routing even when the supplied policy is invalid', () => {
+    const tamperedPolicy = {
+      ...ALCOHOL_WITHDRAWAL_RISK_POLICY_V1,
+      urgentEvidenceKeys: ['previousWithdrawalSeizure'],
+    };
+    const decision = evaluator()(
+      { ...baseEvidence('observe'), currentSeizure: state('present') },
+      decidedAt,
+      tamperedPolicy,
+    );
+    expect(decision.disposition).toBe('emergency_response');
+    expect(decision.reasonCodes).toEqual(['emergency.current_seizure']);
+  });
+
+  it('preserves hard urgent routing when unrelated evidence is malformed', () => {
+    const malformed = {
+      ...baseEvidence('observe'),
+      previousWithdrawalSeizure: { state: 'not-a-state', source: 'self_report' },
+      markedAutonomicSymptoms: state('present'),
+    };
+    const decision = evaluator()(malformed, decidedAt);
+    expect(decision.disposition).toBe('urgent_medical_assessment');
+    expect(decision.reasonCodes).toEqual(['urgent.marked_autonomic_symptoms']);
+  });
+
+  it('fails closed when evidence is malformed and has no hard emergency or urgent signal', () => {
+    const decision = evaluator()(
+      { ...baseEvidence('abstain'), epilepsy: null },
+      decidedAt,
+    );
+    expect(decision.disposition).toBe('medical_assessment_advised');
+    expect(decision.reasonCodes).toEqual(['system.invalid_evidence']);
   });
 });
