@@ -15,22 +15,26 @@ function definition(
   options: {
     requiresEnvironmentMove?: boolean;
     requiresSupport?: boolean;
+    requiresHumanSupport?: boolean;
     estimatedSeconds?: number;
+    recoveryEligible?: boolean;
+    steps?: AlcoholInterventionDefinition['steps'];
   } = {},
 ): AlcoholInterventionDefinition {
-  const copyId = interventionId.replace(/^alcohol-/, '');
+  const copyId = interventionId.replace(/^alcohol-(?:recovery-)?/, '');
+  const copyPrefix = options.recoveryEligible ? 'alcohol.recovery' : 'alcohol.rescue';
   return {
     interventionId,
     version: 1,
     status: 'active',
     family,
     level,
-    titleKey: `alcohol.rescue.${copyId}.title`,
-    summaryKey: `alcohol.rescue.${copyId}.summary`,
-    steps: [
+    titleKey: `${copyPrefix}.${copyId}.title`,
+    summaryKey: `${copyPrefix}.${copyId}.summary`,
+    steps: options.steps ?? [
       {
         stepId: `${interventionId}-step-1`,
-        copyKey: `alcohol.rescue.${copyId}.step.1`,
+        copyKey: `${copyPrefix}.${copyId}.step.1`,
         actionKind,
         skippable: true,
         durationSeconds: options.estimatedSeconds ?? 60,
@@ -45,11 +49,11 @@ function definition(
     },
     safety: {
       medicationAdvice: false,
-      requiresHumanSupport: options.requiresSupport,
+      requiresHumanSupport: options.requiresHumanSupport ?? options.requiresSupport,
     },
     outcomePrompts: [],
     contentHash: 'pending',
-    recoveryEligible: false,
+    recoveryEligible: options.recoveryEligible ?? false,
   };
 }
 
@@ -57,7 +61,7 @@ const candidate: AlcoholRescueLibrary = {
   moduleId: 'alcohol',
   libraryId: 'alcohol-rescue',
   schemaVersion: 1,
-  contentVersion: 1,
+  contentVersion: 2,
   publishedAt: '2026-09-17T00:00:00.000Z',
   contentHash: 'pending',
   interventions: [
@@ -93,6 +97,27 @@ const candidate: AlcoholRescueLibrary = {
     definition('alcohol-human-support', 'human_support', 'human_support', 'human_support', 'high', {
       requiresSupport: true,
       estimatedSeconds: 60,
+    }),
+    definition('alcohol-recovery-reset', 'behavioral_coping', 'micro', 'recovery', 'very_low', {
+      estimatedSeconds: 60,
+      recoveryEligible: true,
+      requiresHumanSupport: false,
+      steps: [
+        {
+          stepId: 'alcohol-recovery-reset-step-1',
+          copyKey: 'alcohol.recovery.reset.step.1',
+          actionKind: 'recovery',
+          skippable: true,
+          durationSeconds: 30,
+        },
+        {
+          stepId: 'alcohol-recovery-reset-step-2',
+          copyKey: 'alcohol.recovery.reset.step.2',
+          actionKind: 'recovery',
+          skippable: true,
+          durationSeconds: 30,
+        },
+      ],
     }),
   ],
 };

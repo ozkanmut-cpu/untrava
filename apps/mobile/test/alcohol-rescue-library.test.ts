@@ -46,7 +46,7 @@ describe('generic intervention library integrity', () => {
 });
 
 describe('bundled Alcohol Rescue library', () => {
-  it('contains the seven approved offline action kinds', () => {
+  it('contains the approved offline action kinds including Recovery', () => {
     expect(
       new Set(
         ALCOHOL_RESCUE_LIBRARY.interventions.flatMap((item) =>
@@ -62,6 +62,7 @@ describe('bundled Alcohol Rescue library', () => {
         'environment_change',
         'cognitive_reframe',
         'human_support',
+        'recovery',
       ]),
     );
   });
@@ -71,7 +72,7 @@ describe('bundled Alcohol Rescue library', () => {
       moduleId: 'alcohol',
       libraryId: 'alcohol-rescue',
       schemaVersion: 1,
-      contentVersion: 1,
+      contentVersion: 2,
       publishedAt: '2026-09-17T00:00:00.000Z',
     });
     expect(hasValidInterventionLibraryIntegrity(ALCOHOL_RESCUE_LIBRARY)).toBe(true);
@@ -103,20 +104,69 @@ describe('bundled Alcohol Rescue library', () => {
     ]);
   });
 
-  it('keeps every intervention offline, medication-free, and outside Recovery', () => {
+  it('keeps the existing interventions offline, medication-free, and outside Recovery', () => {
     const actionKinds = ALCOHOL_RESCUE_LIBRARY.interventions.flatMap((item) =>
       item.steps.map((step) => step.actionKind),
     );
 
-    expect(ALCOHOL_RESCUE_LIBRARY.interventions).toHaveLength(7);
+    expect(ALCOHOL_RESCUE_LIBRARY.interventions).toHaveLength(8);
     expect(ALCOHOL_RESCUE_LIBRARY.interventions.every((item) => item.offlineCapable)).toBe(true);
     expect(
       ALCOHOL_RESCUE_LIBRARY.interventions.every(
         (item) => item.safety.medicationAdvice === false,
       ),
     ).toBe(true);
-    expect(ALCOHOL_RESCUE_LIBRARY.interventions.every((item) => !item.recoveryEligible)).toBe(true);
-    expect(actionKinds).not.toContain('recovery');
+    const recoveryItems = ALCOHOL_RESCUE_LIBRARY.interventions.filter(
+      (item) => item.status === 'active' && item.recoveryEligible,
+    );
+
+    expect(recoveryItems).toHaveLength(1);
+    expect(recoveryItems[0]).toMatchObject({
+      interventionId: 'alcohol-recovery-reset',
+      version: 1,
+      family: 'behavioral_coping',
+      level: 'micro',
+      burden: 'very_low',
+      offlineCapable: true,
+      estimatedSeconds: 60,
+      safety: { medicationAdvice: false, requiresHumanSupport: false },
+    });
+    expect(
+      ALCOHOL_RESCUE_LIBRARY.interventions
+        .filter((item) => item.interventionId !== 'alcohol-recovery-reset')
+        .every((item) => !item.recoveryEligible),
+    ).toBe(true);
+    expect(recoveryItems[0]?.steps).toHaveLength(2);
+    expect(
+      recoveryItems[0]?.steps.every(
+        (step) => step.skippable && step.actionKind === 'recovery',
+      ),
+    ).toBe(true);
+    expect(actionKinds).toContain('recovery');
+  });
+
+  it('provides non-punitive Recovery copy without unsafe guidance or outcome claims', () => {
+    const locale: Readonly<Record<string, string>> = ALCOHOL_RESCUE_LOCALE_BASELINE;
+    const recovery = ALCOHOL_RESCUE_LIBRARY.interventions.find(
+      (item) => item.interventionId === 'alcohol-recovery-reset',
+    );
+    const copyKeys = [
+      recovery?.titleKey,
+      recovery?.summaryKey,
+      ...(recovery?.steps.map((step) => step.copyKey) ?? []),
+    ].filter((key): key is string => Boolean(key));
+    const copy = copyKeys.map((key) => locale[key]).join(' ');
+
+    expect(copyKeys).toEqual([
+      'alcohol.recovery.reset.title',
+      'alcohol.recovery.reset.summary',
+      'alcohol.recovery.reset.step.1',
+      'alcohol.recovery.reset.step.2',
+    ]);
+    expect(copy).toContain('without judgment');
+    expect(copy).toContain('information, not a verdict');
+    expect(copy).not.toMatch(/\b(?:dose|taper|medication|drink schedule)\b/i);
+    expect(copy).not.toMatch(/\b(?:guarantee|ensure|will succeed|success)\b/i);
   });
 
   it('marks support and environment capabilities explicitly', () => {

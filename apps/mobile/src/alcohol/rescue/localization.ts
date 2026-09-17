@@ -22,6 +22,10 @@ export const ALCOHOL_RESCUE_LOCALE_BASELINE = {
   'alcohol.rescue.human-support.title': 'Reach out for support',
   'alcohol.rescue.human-support.summary': 'Choose whether you want another person involved; you remain in control.',
   'alcohol.rescue.human-support.step.1': 'Choose whether to start a support action yourself. Nothing is sent automatically.',
+  'alcohol.recovery.reset.title': 'Reset without judgment',
+  'alcohol.recovery.reset.summary': 'Record what happened, keep your current goal, and choose what would help next.',
+  'alcohol.recovery.reset.step.1': 'Take a brief pause. This use is information, not a verdict on your goal.',
+  'alcohol.recovery.reset.step.2': 'If you want, note the context and choose your next step. Nothing is sent or changed automatically.',
 } as const satisfies Readonly<Record<string, string>>;
 
 function referencedLocalizationKeys(library: AlcoholRescueLibrary): string[] {

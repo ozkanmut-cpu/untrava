@@ -53,6 +53,7 @@ function isEligible(
   safety: WithdrawalSafetyDecision,
 ): boolean {
   if (item.status !== 'active') return false;
+  if (item.recoveryEligible) return false;
   if (context.disabledInterventionIds?.includes(item.interventionId)) return false;
   if (
     item.eligibility.allowedGoalTypes &&
