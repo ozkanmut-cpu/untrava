@@ -10,6 +10,41 @@ declare global {
   }
 }
 
+const forbiddenAlcoholRecoveryAndSafetySymbols = [
+  'AlcoholPlanRelationSchema',
+  'AlcoholInterventionModeSchema',
+  'AlcoholRecoveryNextActionSchema',
+  'AlcoholRecoveryReflectionSchema',
+  'AlcoholRecoveryContextSchema',
+  'AlcoholRecoverySessionStateSchema',
+  'AlcoholRecoverySessionSchema',
+  'AlcoholRecoveryNextAction',
+  'AlcoholInterventionMode',
+  'AlcoholRecoveryReflection',
+  'AlcoholRecoveryContext',
+  'AlcoholRecoverySessionState',
+  'AlcoholRecoverySession',
+  'WithdrawalEvidenceStateSchema',
+  'WithdrawalEvidenceSourceSchema',
+  'WithdrawalEvidenceItemSchema',
+  'AlcoholChangeIntentSchema',
+  'WithdrawalEvidenceKeySchema',
+  'WithdrawalRiskEvidenceSchema',
+  'WithdrawalSafetyDispositionSchema',
+  'WithdrawalSafetyReasonCodeSchema',
+  'WithdrawalRiskPolicySchema',
+  'WithdrawalSafetyDecisionSchema',
+  'WithdrawalEvidenceState',
+  'WithdrawalEvidenceItem',
+  'AlcoholChangeIntent',
+  'WithdrawalEvidenceKey',
+  'WithdrawalRiskEvidence',
+  'WithdrawalSafetyDisposition',
+  'WithdrawalSafetyReasonCode',
+  'WithdrawalRiskPolicy',
+  'WithdrawalSafetyDecision',
+] as const;
+
 const forbiddenCoreTokens = [
   '/tobacco/',
   '../tobacco',
@@ -31,10 +66,9 @@ const forbiddenCoreTokens = [
   "'alcohol_free_days'",
   "'usage_limit'",
   '/alcohol/safety',
-  'WithdrawalRiskEvidenceSchema',
-  'WithdrawalSafetyDecisionSchema',
   'alcohol_withdrawal_risk',
   'previousWithdrawalSeizure',
+  ...forbiddenAlcoholRecoveryAndSafetySymbols,
   'doseMg',
   'doseUnit',
   'doseSchedule',
@@ -43,6 +77,10 @@ const forbiddenCoreTokens = [
   'thiamineDose',
   'benzodiazepineDose',
 ] as const;
+
+function findForbiddenCoreTokens(source: string): string[] {
+  return forbiddenCoreTokens.filter((token) => source.includes(token));
+}
 
 describe('Core import boundary', () => {
   it('exports the generic intervention level contract', () => {
@@ -59,9 +97,13 @@ describe('Core import boundary', () => {
     expect(Object.keys(sources).length).toBeGreaterThan(0);
 
     for (const [path, source] of Object.entries(sources)) {
-      for (const token of forbiddenCoreTokens) {
-        expect(source, `${path} must not contain ${token}`).not.toContain(token);
-      }
+      expect(findForbiddenCoreTokens(source), `${path} must not contain a forbidden token`).toEqual([]);
+    }
+  });
+
+  it('rejects every public Alcohol Recovery and Withdrawal Safety symbol in Core source', () => {
+    for (const symbol of forbiddenAlcoholRecoveryAndSafetySymbols) {
+      expect(findForbiddenCoreTokens(`import { ${symbol} } from '../src/index';`)).toContain(symbol);
     }
   });
 });
