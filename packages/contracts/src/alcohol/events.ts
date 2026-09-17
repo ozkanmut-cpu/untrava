@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { BehaviorEventEnvelopeBaseSchema } from '../core/events';
 import { EventIdSchema } from '../ids';
+import { AlcoholPlanRelationSchema } from './recovery';
+
+export { AlcoholPlanRelationSchema } from './recovery';
 
 export const AlcoholEventTypeSchema = z.enum(['alcohol_use', 'correction', 'retraction']);
 
@@ -17,7 +20,6 @@ export const AlcoholBeverageCategorySchema = z.enum([
 
 export const AlcoholQuantityConfidenceSchema = z.enum(['exact', 'estimated']);
 export const AlcoholEntrySourceSchema = z.enum(['manual', 'favorite', 'repeat_previous']);
-export const AlcoholPlanRelationSchema = z.enum(['planned', 'unplanned', 'unknown']);
 export const AlcoholSocialContextSchema = z.enum(['alone', 'with_others', 'mixed', 'unknown']);
 
 export const PureEthanolMeasurementSchema = z

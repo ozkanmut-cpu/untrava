@@ -17,6 +17,7 @@ export type {
 } from './core/interventions';
 export * from './alcohol/goals';
 export * from './alcohol/events';
+export * from './alcohol/recovery';
 export * from './alcohol/safety';
 export * from './alcohol/rescue';
 export * from './profile';
