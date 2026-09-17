@@ -170,4 +170,194 @@ describe('alcohol event contracts', () => {
       }).success,
     ).toBe(true);
   });
+
+  it('accepts immutable recovery reflection and outcome records', () => {
+    const event = schema('AlcoholEventEnvelopeSchema');
+
+    expect(
+      event.safeParse({
+        ...eventBase,
+        eventType: 'alcohol_recovery_reflection',
+        payload: {
+          recoverySessionId: id,
+          triggeringUseEventId: id,
+          planRelation: 'unplanned',
+          triggerTags: ['stress'],
+          nextAction: 'continue_goal',
+        },
+      }).success,
+    ).toBe(true);
+
+    expect(
+      event.safeParse({
+        ...eventBase,
+        eventType: 'alcohol_recovery_outcome',
+        payload: {
+          recoverySessionId: id,
+          triggeringUseEventId: id,
+          goalId: id,
+          outcome: 'completed',
+          nextAction: 'continue_goal',
+          interventionId: 'alcohol-recovery-reset',
+          interventionVersion: 1,
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects recovery payloads outside their immutable schemas', () => {
+    const event = schema('AlcoholEventEnvelopeSchema');
+    const outcomeStatus = schema('AlcoholRecoveryOutcomeStatusSchema');
+
+    expect(
+      event.safeParse({
+        ...eventBase,
+        eventType: 'alcohol_recovery_reflection',
+        payload: {
+          recoverySessionId: id,
+          triggeringUseEventId: id,
+          nextAction: 'finish',
+          unknown: true,
+        },
+      }).success,
+    ).toBe(false);
+
+    expect(
+      event.safeParse({
+        ...eventBase,
+        eventType: 'alcohol_recovery_outcome',
+        payload: {
+          recoverySessionId: id,
+          triggeringUseEventId: id,
+          outcome: 'completed',
+          unknown: true,
+        },
+      }).success,
+    ).toBe(false);
+
+    expect(outcomeStatus.safeParse('failed').success).toBe(false);
+    expect(outcomeStatus.safeParse('relapse').success).toBe(false);
+
+    for (const safetyAudit of [
+      {
+        ruleSetId: 'withdrawal-v1',
+        ruleSetVersion: 1,
+        disposition: 'urgent_medical_assessment',
+      },
+      {
+        engineId: 'alcohol_withdrawal_risk',
+        ruleSetVersion: 1,
+        disposition: 'urgent_medical_assessment',
+      },
+      {
+        engineId: 'alcohol_withdrawal_risk',
+        ruleSetId: 'withdrawal-v1',
+        ruleSetVersion: 1,
+      },
+    ]) {
+      expect(
+        event.safeParse({
+          ...eventBase,
+          eventType: 'alcohol_recovery_outcome',
+          payload: {
+            recoverySessionId: id,
+            triggeringUseEventId: id,
+            outcome: 'safety_routed',
+            safetyAudit,
+          },
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('requires a complete safety audit only for safety-routed outcomes', () => {
+    const event = schema('AlcoholEventEnvelopeSchema');
+    const safetyAudit = {
+      engineId: 'alcohol_withdrawal_risk',
+      ruleSetId: 'withdrawal-v1',
+      ruleSetVersion: 1,
+      disposition: 'urgent_medical_assessment',
+    };
+
+    expect(
+      event.safeParse({
+        ...eventBase,
+        eventType: 'alcohol_recovery_outcome',
+        payload: {
+          recoverySessionId: id,
+          triggeringUseEventId: id,
+          outcome: 'safety_routed',
+        },
+      }).success,
+    ).toBe(false);
+
+    for (const outcome of ['completed', 'abandoned'] as const) {
+      expect(
+        event.safeParse({
+          ...eventBase,
+          eventType: 'alcohol_recovery_outcome',
+          payload: {
+            recoverySessionId: id,
+            triggeringUseEventId: id,
+            outcome,
+            safetyAudit,
+          },
+        }).success,
+      ).toBe(false);
+    }
+
+    expect(
+      event.safeParse({
+        ...eventBase,
+        eventType: 'alcohol_recovery_outcome',
+        payload: {
+          recoverySessionId: id,
+          triggeringUseEventId: id,
+          outcome: 'safety_routed',
+          safetyAudit,
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('does not mutate an alcohol use record while validating later recovery candidates', () => {
+    const event = schema('AlcoholEventEnvelopeSchema');
+    const alcoholUse = {
+      ...eventBase,
+      payload: {
+        beverageCategory: 'cider',
+        volumeMl: 330,
+        quantityConfidence: 'estimated',
+        entrySource: 'manual',
+        planRelation: 'unplanned',
+      },
+    };
+    const originalBytes = JSON.stringify(alcoholUse);
+
+    expect(event.safeParse(alcoholUse).success).toBe(true);
+    expect(
+      event.safeParse({
+        ...eventBase,
+        eventType: 'alcohol_recovery_reflection',
+        payload: {
+          recoverySessionId: id,
+          triggeringUseEventId: id,
+          nextAction: 'continue_goal',
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      event.safeParse({
+        ...eventBase,
+        eventType: 'alcohol_recovery_outcome',
+        payload: {
+          recoverySessionId: id,
+          triggeringUseEventId: id,
+          outcome: 'abandoned',
+        },
+      }).success,
+    ).toBe(true);
+
+    expect(JSON.stringify(alcoholUse)).toBe(originalBytes);
+  });
 });

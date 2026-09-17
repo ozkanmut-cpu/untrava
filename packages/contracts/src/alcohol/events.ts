@@ -1,11 +1,21 @@
 import { z } from 'zod';
 import { BehaviorEventEnvelopeBaseSchema } from '../core/events';
 import { EventIdSchema } from '../ids';
-import { AlcoholPlanRelationSchema } from './recovery';
+import {
+  AlcoholPlanRelationSchema,
+  AlcoholRecoveryNextActionSchema,
+  AlcoholRecoveryReflectionSchema,
+} from './recovery';
 
 export { AlcoholPlanRelationSchema } from './recovery';
 
-export const AlcoholEventTypeSchema = z.enum(['alcohol_use', 'correction', 'retraction']);
+export const AlcoholEventTypeSchema = z.enum([
+  'alcohol_use',
+  'alcohol_recovery_reflection',
+  'alcohol_recovery_outcome',
+  'correction',
+  'retraction',
+]);
 
 export const AlcoholBeverageCategorySchema = z.enum([
   'beer',
@@ -64,6 +74,52 @@ export const AlcoholUsePayloadSchema = z.union([
   UnknownAbvAlcoholUsePayloadSchema,
 ]);
 
+export const AlcoholRecoveryOutcomeStatusSchema = z.enum(['completed', 'abandoned', 'safety_routed']);
+
+export const AlcoholRecoveryReflectionPayloadSchema = AlcoholRecoveryReflectionSchema.extend({
+  recoverySessionId: z.uuid(),
+  triggeringUseEventId: EventIdSchema,
+}).strict();
+
+const AlcoholRecoverySafetyAuditSchema = z
+  .object({
+    engineId: z.literal('alcohol_withdrawal_risk'),
+    ruleSetId: z.string().min(1),
+    ruleSetVersion: z.number().int().positive(),
+    disposition: z.enum(['urgent_medical_assessment', 'emergency_response']),
+  })
+  .strict();
+
+export const AlcoholRecoveryOutcomePayloadSchema = z
+  .object({
+    recoverySessionId: z.uuid(),
+    triggeringUseEventId: EventIdSchema,
+    goalId: z.uuid().optional(),
+    outcome: AlcoholRecoveryOutcomeStatusSchema,
+    nextAction: AlcoholRecoveryNextActionSchema.optional(),
+    interventionId: z.string().min(1).optional(),
+    interventionVersion: z.number().int().positive().optional(),
+    safetyAudit: AlcoholRecoverySafetyAuditSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.outcome === 'safety_routed' && value.safetyAudit === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['safetyAudit'],
+        message: 'Safety-routed outcomes require a safety audit',
+      });
+    }
+
+    if (value.outcome !== 'safety_routed' && value.safetyAudit !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['safetyAudit'],
+        message: 'Safety audit is only allowed for safety-routed outcomes',
+      });
+    }
+  });
+
 const AlcoholEventBaseSchema = BehaviorEventEnvelopeBaseSchema.extend({
   moduleId: z.literal('alcohol'),
   schemaVersion: z.literal(1),
@@ -72,6 +128,16 @@ const AlcoholEventBaseSchema = BehaviorEventEnvelopeBaseSchema.extend({
 const AlcoholUseEventSchema = AlcoholEventBaseSchema.extend({
   eventType: z.literal('alcohol_use'),
   payload: AlcoholUsePayloadSchema,
+});
+
+const AlcoholRecoveryReflectionEventSchema = AlcoholEventBaseSchema.extend({
+  eventType: z.literal('alcohol_recovery_reflection'),
+  payload: AlcoholRecoveryReflectionPayloadSchema,
+});
+
+const AlcoholRecoveryOutcomeEventSchema = AlcoholEventBaseSchema.extend({
+  eventType: z.literal('alcohol_recovery_outcome'),
+  payload: AlcoholRecoveryOutcomePayloadSchema,
 });
 
 const AlcoholCorrectionEventSchema = AlcoholEventBaseSchema.extend({
@@ -94,6 +160,8 @@ const AlcoholRetractionEventSchema = AlcoholEventBaseSchema.extend({
 
 export const AlcoholEventEnvelopeSchema = z.discriminatedUnion('eventType', [
   AlcoholUseEventSchema,
+  AlcoholRecoveryReflectionEventSchema,
+  AlcoholRecoveryOutcomeEventSchema,
   AlcoholCorrectionEventSchema,
   AlcoholRetractionEventSchema,
 ]);
@@ -101,4 +169,7 @@ export const AlcoholEventEnvelopeSchema = z.discriminatedUnion('eventType', [
 export type AlcoholEventType = z.infer<typeof AlcoholEventTypeSchema>;
 export type AlcoholBeverageCategory = z.infer<typeof AlcoholBeverageCategorySchema>;
 export type AlcoholUsePayload = z.infer<typeof AlcoholUsePayloadSchema>;
+export type AlcoholRecoveryOutcomeStatus = z.infer<typeof AlcoholRecoveryOutcomeStatusSchema>;
+export type AlcoholRecoveryReflectionPayload = z.infer<typeof AlcoholRecoveryReflectionPayloadSchema>;
+export type AlcoholRecoveryOutcomePayload = z.infer<typeof AlcoholRecoveryOutcomePayloadSchema>;
 export type AlcoholEventEnvelope = z.infer<typeof AlcoholEventEnvelopeSchema>;
