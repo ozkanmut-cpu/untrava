@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ALCOHOL_RESCUE_LIBRARY,
+  findMissingAlcoholRescueLocalizationKeys,
+} from '../src/alcohol/rescue';
+import {
   hasValidInterventionLibraryIntegrity,
   sealInterventionLibrary,
 } from '../src/rescue/library-integrity';
@@ -37,5 +41,66 @@ describe('generic intervention library integrity', () => {
     };
 
     expect(hasValidInterventionLibraryIntegrity(tampered)).toBe(false);
+  });
+});
+
+describe('bundled Alcohol Rescue library', () => {
+  it('contains the seven approved offline action kinds', () => {
+    expect(
+      new Set(
+        ALCOHOL_RESCUE_LIBRARY.interventions.flatMap((item) =>
+          item.steps.map((step) => step.actionKind),
+        ),
+      ),
+    ).toEqual(
+      new Set([
+        'breathing',
+        'urge_surfing',
+        'delay',
+        'substitution',
+        'environment_change',
+        'cognitive_reframe',
+        'human_support',
+      ]),
+    );
+  });
+
+  it('uses collision-safe identity and valid sealed integrity', () => {
+    expect(ALCOHOL_RESCUE_LIBRARY).toMatchObject({
+      moduleId: 'alcohol',
+      libraryId: 'alcohol-rescue',
+      schemaVersion: 1,
+      contentVersion: 1,
+      publishedAt: '2026-09-17T00:00:00.000Z',
+    });
+    expect(hasValidInterventionLibraryIntegrity(ALCOHOL_RESCUE_LIBRARY)).toBe(true);
+  });
+
+  it('has complete fail-closed localization coverage', () => {
+    expect(findMissingAlcoholRescueLocalizationKeys(ALCOHOL_RESCUE_LIBRARY)).toEqual([]);
+  });
+
+  it('keeps every intervention offline, medication-free, and outside Recovery', () => {
+    expect(ALCOHOL_RESCUE_LIBRARY.interventions).toHaveLength(7);
+    expect(ALCOHOL_RESCUE_LIBRARY.interventions.every((item) => item.offlineCapable)).toBe(true);
+    expect(
+      ALCOHOL_RESCUE_LIBRARY.interventions.every(
+        (item) => item.safety.medicationAdvice === false,
+      ),
+    ).toBe(true);
+    expect(ALCOHOL_RESCUE_LIBRARY.interventions.every((item) => !item.recoveryEligible)).toBe(true);
+  });
+
+  it('marks support and environment capabilities explicitly', () => {
+    const support = ALCOHOL_RESCUE_LIBRARY.interventions.find(
+      (item) => item.interventionId === 'alcohol-human-support',
+    );
+    const environment = ALCOHOL_RESCUE_LIBRARY.interventions.find(
+      (item) => item.interventionId === 'alcohol-environment-change',
+    );
+
+    expect(support?.eligibility.requiresSupport).toBe(true);
+    expect(support?.safety.requiresHumanSupport).toBe(true);
+    expect(environment?.eligibility.requiresEnvironmentMove).toBe(true);
   });
 });
