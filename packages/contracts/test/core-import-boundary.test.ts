@@ -28,6 +28,11 @@ const forbiddenCoreTokens = [
   "'abstinence'",
   "'alcohol_free_days'",
   "'usage_limit'",
+  '/alcohol/safety',
+  'WithdrawalRiskEvidenceSchema',
+  'WithdrawalSafetyDecisionSchema',
+  'alcohol_withdrawal_risk',
+  'previousWithdrawalSeizure',
 ] as const;
 
 describe('Core import boundary', () => {
