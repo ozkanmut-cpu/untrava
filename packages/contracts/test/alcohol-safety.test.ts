@@ -41,6 +41,17 @@ const completeEvidence = {
   significantActivePsychiatricIllnessOrCognitiveImpairment: item('absent'),
 };
 
+const validDecision = {
+  engineId: 'alcohol_withdrawal_risk',
+  ruleSetId: 'alcohol_withdrawal_risk_v1',
+  ruleSetVersion: 1,
+  disposition: 'medical_assessment_advised',
+  reasonCodes: ['history.previous_withdrawal_seizure'],
+  evaluatedEvidenceKeys: ['previousWithdrawalSeizure'],
+  unknownCriticalEvidenceKeys: [],
+  decidedAt: '2026-09-17T02:30:00.000Z',
+} as const;
+
 describe('Alcohol withdrawal safety contracts', () => {
   it('exports and accepts tri-state structured withdrawal evidence', () => {
     expect(safetyContracts.WithdrawalRiskEvidenceSchema).toBeDefined();
@@ -72,17 +83,48 @@ describe('Alcohol withdrawal safety contracts', () => {
   it('validates an auditable decision trace', () => {
     expect(safetyContracts.WithdrawalSafetyDecisionSchema).toBeDefined();
     if (!safetyContracts.WithdrawalSafetyDecisionSchema) throw new Error('WithdrawalSafetyDecisionSchema must be exported');
-    expect(
-      safetyContracts.WithdrawalSafetyDecisionSchema.parse({
-        engineId: 'alcohol_withdrawal_risk',
-        ruleSetId: 'alcohol_withdrawal_risk_v1',
-        ruleSetVersion: 1,
-        disposition: 'medical_assessment_advised',
-        reasonCodes: ['history.previous_withdrawal_seizure'],
-        evaluatedEvidenceKeys: ['previousWithdrawalSeizure'],
-        unknownCriticalEvidenceKeys: [],
-        decidedAt: '2026-09-17T02:30:00.000Z',
+    expect(safetyContracts.WithdrawalSafetyDecisionSchema.parse(validDecision)).toBeDefined();
+  });
+
+  it('rejects taper or drinking-schedule instructions in a safety decision', () => {
+    expect(safetyContracts.WithdrawalSafetyDecisionSchema).toBeDefined();
+    if (!safetyContracts.WithdrawalSafetyDecisionSchema) throw new Error('WithdrawalSafetyDecisionSchema must be exported');
+
+    expect(() =>
+      safetyContracts.WithdrawalSafetyDecisionSchema?.parse({
+        ...validDecision,
+        taperPlan: [{ day: 1, drinks: 6 }],
       }),
-    ).toBeDefined();
+    ).toThrow();
+
+    expect(() =>
+      safetyContracts.WithdrawalSafetyDecisionSchema?.parse({
+        ...validDecision,
+        drinkSchedule: [{ at: '18:00', amount: 2 }],
+      }),
+    ).toThrow();
+  });
+
+  it('rejects medication, dose and prescription-change instructions in a safety decision', () => {
+    expect(safetyContracts.WithdrawalSafetyDecisionSchema).toBeDefined();
+    if (!safetyContracts.WithdrawalSafetyDecisionSchema) throw new Error('WithdrawalSafetyDecisionSchema must be exported');
+
+    for (const forbiddenField of [
+      ['medicationName', 'example'],
+      ['medicationDose', 10],
+      ['doseAmount', 10],
+      ['doseUnit', 'mg'],
+      ['doseSchedule', ['08:00']],
+      ['prescriptionChange', 'stop'],
+      ['thiamineDose', 100],
+      ['benzodiazepineDose', 5],
+    ] as const) {
+      expect(() =>
+        safetyContracts.WithdrawalSafetyDecisionSchema?.parse({
+          ...validDecision,
+          [forbiddenField[0]]: forbiddenField[1],
+        }),
+      ).toThrow();
+    }
   });
 });
