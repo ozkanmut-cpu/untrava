@@ -1,0 +1,64 @@
+import { describe, expect, it } from 'vitest';
+import * as contracts from '../src/index';
+
+const item = (state: 'present' | 'absent' | 'unknown') => ({
+  state,
+  source: 'self_report' as const,
+});
+
+const completeEvidence = {
+  changeIntent: 'abstain' as const,
+  previousWithdrawalSeizure: item('absent'),
+  previousWithdrawalDelirium: item('absent'),
+  previousSevereWithdrawal: item('absent'),
+  repeatedWithdrawalEpisodes: item('absent'),
+  priorMedicallyAssistedWithdrawalComplication: item('absent'),
+  currentSeizure: item('absent'),
+  severeConfusionOrDisorientation: item('absent'),
+  withdrawalSymptomsAfterReduction: item('absent'),
+  markedAutonomicSymptoms: item('absent'),
+  significantPerceptualDisturbance: item('absent'),
+  longDurationHeavyRegularUse: item('absent'),
+  morningDrinkingOrReliefDrinking: item('absent'),
+  priorWithdrawalSymptomsWhenCuttingDownOrStopping: item('absent'),
+  sedativeHypnoticPhysiologicalDependence: item('absent'),
+  epilepsy: item('absent'),
+  significantUnstableMedicalIllness: item('absent'),
+  significantActivePsychiatricIllnessOrCognitiveImpairment: item('absent'),
+};
+
+describe('Alcohol withdrawal safety contracts', () => {
+  it('exports and accepts tri-state structured withdrawal evidence', () => {
+    expect(contracts.WithdrawalRiskEvidenceSchema).toBeDefined();
+    expect(contracts.WithdrawalRiskEvidenceSchema.parse(completeEvidence)).toEqual(completeEvidence);
+  });
+
+  it('rejects missing evidence fields instead of treating missing as absent', () => {
+    const { previousWithdrawalSeizure: _removed, ...incomplete } = completeEvidence;
+    expect(() => contracts.WithdrawalRiskEvidenceSchema.parse(incomplete)).toThrow();
+  });
+
+  it('accepts only the four frozen product routing dispositions', () => {
+    expect(contracts.WithdrawalSafetyDispositionSchema.options).toEqual([
+      'behavior_change_support_allowed',
+      'medical_assessment_advised',
+      'urgent_medical_assessment',
+      'emergency_response',
+    ]);
+  });
+
+  it('validates an auditable decision trace', () => {
+    expect(
+      contracts.WithdrawalSafetyDecisionSchema.parse({
+        engineId: 'alcohol_withdrawal_risk',
+        ruleSetId: 'alcohol_withdrawal_risk_v1',
+        ruleSetVersion: 1,
+        disposition: 'medical_assessment_advised',
+        reasonCodes: ['history.previous_withdrawal_seizure'],
+        evaluatedEvidenceKeys: ['previousWithdrawalSeizure'],
+        unknownCriticalEvidenceKeys: [],
+        decidedAt: '2026-09-17T02:30:00.000Z',
+      }),
+    ).toBeDefined();
+  });
+});
