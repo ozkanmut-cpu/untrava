@@ -1,4 +1,8 @@
-import { QuitEventEnvelopeSchema, type QuitEventEnvelope } from '../../../packages/contracts/src/index';
+import {
+  QuitEventEnvelopeSchema,
+  type BehaviorEventEnvelopeBase,
+  type QuitEventEnvelope,
+} from '../../../packages/contracts/src/index';
 
 export type LocalSyncState = 'pending' | 'synced' | 'failed';
 
@@ -18,29 +22,42 @@ export interface LocalEventDatabase {
   markSynced(eventId: string, syncedAt: string): Promise<void>;
 }
 
-export class LocalEventStore {
-  constructor(private readonly database: LocalEventDatabase) {}
+type LocalEventEnvelope = BehaviorEventEnvelopeBase | QuitEventEnvelope;
 
-  async append(candidate: QuitEventEnvelope): Promise<void> {
-    const event = QuitEventEnvelopeSchema.parse(candidate);
+interface EnvelopeSchema<TEvent extends LocalEventEnvelope> {
+  parse(candidate: unknown): TEvent;
+}
+
+export class LocalEventStore<TEvent extends LocalEventEnvelope = QuitEventEnvelope> {
+  private readonly schema: EnvelopeSchema<TEvent>;
+
+  constructor(
+    private readonly database: LocalEventDatabase,
+    schema?: EnvelopeSchema<TEvent>,
+  ) {
+    this.schema = schema ?? (QuitEventEnvelopeSchema as unknown as EnvelopeSchema<TEvent>);
+  }
+
+  async append(candidate: TEvent): Promise<void> {
+    const event = this.schema.parse(candidate);
     const envelope = JSON.stringify(event);
     const existing = await this.database.get(event.eventId);
     if (existing) {
-      const existingEvent = QuitEventEnvelopeSchema.parse(JSON.parse(existing.envelope));
+      const existingEvent = this.schema.parse(JSON.parse(existing.envelope));
       if (JSON.stringify(existingEvent) === envelope) return;
       throw new Error('conflicting_event_id');
     }
     await this.database.insert(event.eventId, envelope);
   }
 
-  async get(eventId: string): Promise<QuitEventEnvelope | null> {
+  async get(eventId: string): Promise<TEvent | null> {
     const row = await this.database.get(eventId);
-    return row ? QuitEventEnvelopeSchema.parse(JSON.parse(row.envelope)) : null;
+    return row ? this.schema.parse(JSON.parse(row.envelope)) : null;
   }
 
-  async listPending(limit: number): Promise<QuitEventEnvelope[]> {
+  async listPending(limit: number): Promise<TEvent[]> {
     const rows = await this.database.listPending(limit);
-    return rows.map((row) => QuitEventEnvelopeSchema.parse(JSON.parse(row.envelope)));
+    return rows.map((row) => this.schema.parse(JSON.parse(row.envelope)));
   }
 
   markSynced(eventId: string, syncedAt: string): Promise<void> {
