@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import {
   addInterventionLibraryIssues,
-  InterventionActionKindSchema,
   InterventionBaseEligibilitySchema,
   InterventionBurdenSchema,
   InterventionFamilySchema,
@@ -69,4 +68,3 @@ export type AlcoholRescueContext = z.infer<typeof AlcoholRescueContextSchema>;
 export type AlcoholInterventionEligibility = z.infer<typeof AlcoholInterventionEligibilitySchema>;
 export type AlcoholInterventionDefinition = z.infer<typeof AlcoholInterventionDefinitionSchema>;
 export type AlcoholRescueLibrary = z.infer<typeof AlcoholRescueLibrarySchema>;
-export type AlcoholRescueActionKind = z.infer<typeof InterventionActionKindSchema>;
