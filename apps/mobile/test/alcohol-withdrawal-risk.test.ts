@@ -172,4 +172,48 @@ describe('evaluateWithdrawalRisk', () => {
     expect(decision.disposition).toBe('medical_assessment_advised');
     expect(decision.reasonCodes).toEqual(['system.invalid_evidence']);
   });
+
+  it('emits only routing and audit fields across every disposition', () => {
+    const decisions = [
+      evaluator()({ ...baseEvidence('observe'), currentSeizure: state('present') }, decidedAt),
+      evaluator()({ ...baseEvidence('observe'), markedAutonomicSymptoms: state('present') }, decidedAt),
+      evaluator()({ ...baseEvidence('abstain'), previousWithdrawalSeizure: state('present') }, decidedAt),
+      evaluator()(baseEvidence('abstain'), decidedAt),
+    ] as Array<WithdrawalSafetyDecision & Record<string, unknown>>;
+
+    expect(decisions.map((decision) => decision.disposition)).toEqual([
+      'emergency_response',
+      'urgent_medical_assessment',
+      'medical_assessment_advised',
+      'behavior_change_support_allowed',
+    ]);
+
+    const allowedKeys = [
+      'decidedAt',
+      'disposition',
+      'engineId',
+      'evaluatedEvidenceKeys',
+      'reasonCodes',
+      'ruleSetId',
+      'ruleSetVersion',
+      'unknownCriticalEvidenceKeys',
+    ];
+    const forbiddenInstructionTokens = [
+      'taper',
+      'drinkschedule',
+      'medication',
+      'dose',
+      'prescription',
+      'thiamine',
+      'benzodiazepinedose',
+    ];
+
+    for (const decision of decisions) {
+      expect(Object.keys(decision).sort()).toEqual(allowedKeys);
+      const serialized = JSON.stringify(decision).toLowerCase();
+      for (const token of forbiddenInstructionTokens) {
+        expect(serialized).not.toContain(token);
+      }
+    }
+  });
 });
