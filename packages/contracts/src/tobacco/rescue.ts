@@ -1,17 +1,28 @@
 import { z } from 'zod';
 import { DeviceIdSchema, UserIdSchema } from '../ids';
+import {
+  addInterventionLibraryIssues,
+  InterventionActionKindSchema,
+  InterventionBaseEligibilitySchema,
+  InterventionBurdenSchema,
+  InterventionFamilySchema,
+  InterventionLevelSchema,
+  InterventionOutcomePromptSchema,
+  InterventionSafetyMetadataSchema,
+  InterventionStepSchema,
+} from '../core/interventions';
 import { GoalTypeSchema, ProductTypeSchema } from './profile';
 
-export const RescueLevelSchema = z.enum(['micro', 'guided', 'environment_escape', 'human_support']);
-export const InterventionFamilySchema = z.enum([
-  'act',
-  'cbt',
-  'behavioral_coping',
-  'mindfulness_regulation',
-  'environment_change',
-  'human_support',
-]);
-export const InterventionBurdenSchema = z.enum(['very_low', 'low', 'medium', 'high']);
+export {
+  InterventionActionKindSchema,
+  InterventionBurdenSchema,
+  InterventionFamilySchema,
+  InterventionOutcomePromptSchema,
+  InterventionSafetyMetadataSchema,
+  InterventionStepSchema,
+};
+
+export const RescueLevelSchema = InterventionLevelSchema;
 export const RescueProductIntentSchema = ProductTypeSchema;
 export const RescueProductUseOutcomeSchema = z.enum(['no_use', 'use', 'unknown']);
 export const RescueSessionStateSchema = z.enum([
@@ -27,47 +38,8 @@ export const RescueSessionStateSchema = z.enum([
   'abandoned',
 ]);
 
-export const InterventionActionKindSchema = z.enum([
-  'breathing',
-  'urge_surfing',
-  'cognitive_reframe',
-  'delay',
-  'substitution',
-  'environment_change',
-  'human_support',
-  'recovery',
-]);
-
-export const InterventionStepSchema = z.object({
-  stepId: z.string().min(1),
-  copyKey: z.string().min(1),
-  actionKind: InterventionActionKindSchema,
-  skippable: z.boolean(),
-  durationSeconds: z.number().int().positive().optional(),
-  accessibility: z.record(z.string(), z.string()).optional(),
-});
-
-export const InterventionEligibilitySchema = z.object({
-  requiresEnvironmentMove: z.boolean().optional(),
-  requiresAudio: z.boolean().optional(),
-  requiresSupport: z.boolean().optional(),
+export const InterventionEligibilitySchema = InterventionBaseEligibilitySchema.extend({
   allowedGoalTypes: z.array(GoalTypeSchema).min(1).optional(),
-});
-
-export const InterventionSafetyMetadataSchema = z
-  .object({
-    medicationAdvice: z.literal(false),
-    requiresHumanSupport: z.boolean().optional(),
-    avoidWhen: z.array(z.string().min(1)).optional(),
-    escalationMessageKey: z.string().min(1).optional(),
-  })
-  .strict();
-
-export const InterventionOutcomePromptSchema = z.object({
-  promptId: z.string().min(1),
-  copyKey: z.string().min(1),
-  kind: z.enum(['craving', 'delay', 'environment', 'exercise', 'support', 'product_use', 'helpfulness']),
-  optional: z.boolean().default(true),
 });
 
 export const InterventionDefinitionSchema = z.object({
@@ -99,38 +71,7 @@ export const RescueLibrarySchema = z
     contentHash: z.string().min(1),
   })
   .superRefine((library, ctx) => {
-    const identities = new Set<string>();
-    const activeIds = new Set<string>();
-
-    library.interventions.forEach((intervention, index) => {
-      const identity = `${intervention.interventionId}:${intervention.version}`;
-      if (identities.has(identity)) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'duplicate_intervention_version',
-          path: ['interventions', index],
-        });
-      }
-      identities.add(identity);
-
-      if (intervention.status === 'active') {
-        if (intervention.steps.length === 0) {
-          ctx.addIssue({
-            code: 'custom',
-            message: 'active_intervention_requires_step',
-            path: ['interventions', index, 'steps'],
-          });
-        }
-        if (activeIds.has(intervention.interventionId)) {
-          ctx.addIssue({
-            code: 'custom',
-            message: 'duplicate_active_intervention',
-            path: ['interventions', index],
-          });
-        }
-        activeIds.add(intervention.interventionId);
-      }
-    });
+    addInterventionLibraryIssues(library.interventions, ctx);
   });
 
 export const RescueContextSchema = z.object({
