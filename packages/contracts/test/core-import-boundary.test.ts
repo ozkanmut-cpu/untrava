@@ -15,6 +15,7 @@ const forbiddenCoreTokens = [
   '../tobacco',
   'ProductTypeSchema',
   'GoalTypeSchema',
+  'RescueProductIntentSchema',
   "'cigarette'",
   "'vape'",
   "'heated_tobacco'",
@@ -34,6 +35,13 @@ const forbiddenCoreTokens = [
   'WithdrawalSafetyDecisionSchema',
   'alcohol_withdrawal_risk',
   'previousWithdrawalSeizure',
+  'doseMg',
+  'doseUnit',
+  'doseSchedule',
+  'taperPlan',
+  'prescriptionChange',
+  'thiamineDose',
+  'benzodiazepineDose',
 ] as const;
 
 describe('Core import boundary', () => {

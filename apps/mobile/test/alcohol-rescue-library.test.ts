@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALCOHOL_RESCUE_LIBRARY,
+  ALCOHOL_RESCUE_LOCALE_BASELINE,
   findMissingAlcoholRescueLocalizationKeys,
 } from '../src/alcohol/rescue';
 import {
@@ -80,7 +81,33 @@ describe('bundled Alcohol Rescue library', () => {
     expect(findMissingAlcoholRescueLocalizationKeys(ALCOHOL_RESCUE_LIBRARY)).toEqual([]);
   });
 
+  it('reports a missing referenced localization key', () => {
+    const missingKey = 'alcohol.rescue.missing.step';
+    const [first, ...rest] = ALCOHOL_RESCUE_LIBRARY.interventions;
+    const candidate = {
+      ...ALCOHOL_RESCUE_LIBRARY,
+      interventions: [
+        {
+          ...first!,
+          steps: [
+            { ...first!.steps[0]!, copyKey: missingKey },
+            ...first!.steps.slice(1),
+          ],
+        },
+        ...rest,
+      ],
+    };
+
+    expect(findMissingAlcoholRescueLocalizationKeys(candidate)).toEqual([
+      missingKey,
+    ]);
+  });
+
   it('keeps every intervention offline, medication-free, and outside Recovery', () => {
+    const actionKinds = ALCOHOL_RESCUE_LIBRARY.interventions.flatMap((item) =>
+      item.steps.map((step) => step.actionKind),
+    );
+
     expect(ALCOHOL_RESCUE_LIBRARY.interventions).toHaveLength(7);
     expect(ALCOHOL_RESCUE_LIBRARY.interventions.every((item) => item.offlineCapable)).toBe(true);
     expect(
@@ -89,6 +116,7 @@ describe('bundled Alcohol Rescue library', () => {
       ),
     ).toBe(true);
     expect(ALCOHOL_RESCUE_LIBRARY.interventions.every((item) => !item.recoveryEligible)).toBe(true);
+    expect(actionKinds).not.toContain('recovery');
   });
 
   it('marks support and environment capabilities explicitly', () => {
@@ -102,5 +130,22 @@ describe('bundled Alcohol Rescue library', () => {
     expect(support?.eligibility.requiresSupport).toBe(true);
     expect(support?.safety.requiresHumanSupport).toBe(true);
     expect(environment?.eligibility.requiresEnvironmentMove).toBe(true);
+  });
+
+  it('keeps human support offer-only and explicitly user-controlled', () => {
+    const support = ALCOHOL_RESCUE_LIBRARY.interventions.find(
+      (item) => item.interventionId === 'alcohol-human-support',
+    );
+    const locale: Readonly<Record<string, string>> =
+      ALCOHOL_RESCUE_LOCALE_BASELINE;
+    const copyKeys = [
+      support?.summaryKey,
+      ...support!.steps.map((step) => step.copyKey),
+    ].filter((key): key is string => Boolean(key));
+    const copy = copyKeys.map((key) => locale[key]).join(' ');
+
+    expect(copy).toContain('you remain in control');
+    expect(copy).toContain('yourself');
+    expect(copy).toContain('Nothing is sent automatically');
   });
 });
