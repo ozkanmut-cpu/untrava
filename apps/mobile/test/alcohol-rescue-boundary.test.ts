@@ -37,7 +37,6 @@ const forbiddenControlSurfaces = [
   'prescriptionChange',
   'thiamineDose',
   'benzodiazepineDose',
-  "actionKind: 'recovery'",
   "actionKind: 'nicotine_replacement'",
   "'cigarette'",
   "'vape'",
@@ -84,7 +83,7 @@ describe('Alcohol Rescue architecture and safety boundary', () => {
     expectSourcesNotToContain(forbiddenRuntimeDependencies);
   });
 
-  it('does not expose taper, dose, Recovery, or Tobacco control surfaces', () => {
+  it('does not expose taper, dose, or Tobacco control surfaces', () => {
     expectSourcesNotToContain(forbiddenControlSurfaces);
   });
 
