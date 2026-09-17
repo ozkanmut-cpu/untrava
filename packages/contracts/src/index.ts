@@ -20,6 +20,7 @@ export * from './alcohol/events';
 export * from './alcohol/recovery';
 export * from './alcohol/safety';
 export * from './alcohol/rescue';
+export * from './alcohol/pattern-risk';
 export * from './profile';
 export * from './events';
 export * from './consent';
