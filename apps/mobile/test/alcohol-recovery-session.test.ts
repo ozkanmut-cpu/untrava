@@ -162,6 +162,50 @@ describe('AlcoholRecoverySessionCoordinator', () => {
     expect(reflected.complete(undefined, later).reflection).toEqual({ nextAction: 'finish' });
   });
 
+  it.each(['intervention_selected', 'intervention_active'] as const)(
+    'retains provenance on abandonment from %s only if activated', (state) => {
+      for (const origin of ['fresh', 'resumed']) {
+        const store = new MemoryAlcoholRecoverySessionStore();
+        const selected = start(store);
+        selected.beginReflection(now);
+        selected.recordReflection({ nextAction: 'review_plan' }, now);
+        selected.selectReset(ALCOHOL_RESCUE_LIBRARY, now);
+        if (state === 'intervention_active') selected.beginSelected(now);
+        const recovery = origin === 'resumed'
+          ? AlcoholRecoverySessionCoordinator.resume(selected.snapshot(), store)
+          : selected;
+        const before = recovery.snapshot();
+        const abandoned = recovery.abandon(later);
+        expect(abandoned).toEqual({
+          ...before, state: 'abandoned', updatedAt: later,
+          interventionId: state === 'intervention_active' ? 'alcohol-recovery-reset' : null,
+          interventionVersion: state === 'intervention_active' ? 1 : null,
+        });
+        expect(store.get(before.context.recoverySessionId)).toEqual(abandoned);
+      }
+    },
+  );
+
+  it.each(['intervention_selected', 'intervention_active'] as const)(
+    'preserves %s provenance when abandonment persistence fails', (state) => {
+      const memory = new MemoryAlcoholRecoverySessionStore();
+      let fail = false;
+      const store: AlcoholRecoverySessionStore = {
+        get: (id) => memory.get(id),
+        save(snapshot) {
+          if (fail) throw new Error('local_persistence_failed');
+          memory.save(snapshot);
+        },
+      };
+      const recovery = atState(state, store);
+      const before = recovery.snapshot();
+      fail = true;
+      expect(() => recovery.abandon(later)).toThrow('local_persistence_failed');
+      expect(recovery.snapshot()).toEqual(before);
+      expect(memory.get(before.context.recoverySessionId)).toEqual(before);
+    },
+  );
+
   it.each(states)('round-trips a validated %s snapshot with no aliases', (state) => {
     const store = new MemoryAlcoholRecoverySessionStore();
     const original = atState(state).snapshot();
@@ -186,19 +230,34 @@ describe('AlcoholRecoverySessionCoordinator', () => {
   });
 
   it.each(['emergency_response', 'urgent_medical_assessment'] as const)(
-    'honors pinned %s safety even for a resumed behavior-state snapshot',
+    'rejects impossible %s snapshots before resume persistence',
     (disposition) => {
       for (const state of ['started', 'reflecting', 'intervention_selected', 'intervention_active'] as const) {
         const snapshot = atState(state).snapshot();
         snapshot.context.safetyDecision = context(disposition).safetyDecision;
-        const resumed = AlcoholRecoverySessionCoordinator.resume(snapshot);
-        for (const operation of operations.filter((op) => !['completeSafetyRouting', 'abandon'].includes(op.name))) {
-          expect(() => operation.run(resumed)).toThrow('invalid_alcohol_recovery_transition');
-          expect(resumed.snapshot()).toEqual(snapshot);
-        }
+        const saved: AlcoholRecoverySession[] = [];
+        const store: AlcoholRecoverySessionStore = { save: (value) => { saved.push(value); }, get: () => null };
+        expect(() => AlcoholRecoverySessionCoordinator.resume(snapshot, store)).toThrow();
+        expect(saved).toEqual([]);
       }
     },
   );
+
+  it.each([
+    { state: 'intervention_active' as const },
+    { state: 'intervention_selected' as const },
+    { state: 'completed' as const },
+    { interventionId: 'alcohol-recovery-reset' },
+    { interventionVersion: 1 },
+    { reflection: {} },
+    { state: 'safety_routing' as const },
+  ])('rejects contradictory resume fields %j before persistence', (fields) => {
+    const saved: AlcoholRecoverySession[] = [];
+    const store: AlcoholRecoverySessionStore = { save: (value) => { saved.push(value); }, get: () => null };
+    const invalid = { ...start().snapshot(), ...fields };
+    expect(() => AlcoholRecoverySessionCoordinator.resume(invalid, store)).toThrow();
+    expect(saved).toEqual([]);
+  });
 
   it('rejects unavailable selection without committing', () => {
     const store = new MemoryAlcoholRecoverySessionStore();

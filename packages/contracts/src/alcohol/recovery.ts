@@ -62,7 +62,44 @@ export const AlcoholRecoverySessionSchema = z
     startedAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
-  .strict();
+  .strict()
+  .superRefine((session, ctx) => {
+    const hasId = session.interventionId !== null;
+    const hasVersion = session.interventionVersion !== null;
+    const hasIntervention = hasId || hasVersion;
+    const safetyRouting = session.context.safetyDecision.disposition === 'emergency_response' ||
+      session.context.safetyDecision.disposition === 'urgent_medical_assessment';
+    const beforeSelection = session.state === 'started' || session.state === 'reflecting';
+
+    if (hasId !== hasVersion) {
+      ctx.addIssue({ code: 'custom', message: 'alcohol_recovery_intervention_provenance_incomplete', path: ['interventionId'] });
+    }
+    if (
+      (safetyRouting && !['safety_routing', 'completed', 'abandoned'].includes(session.state)) ||
+      (!safetyRouting && session.state === 'safety_routing')
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'alcohol_recovery_safety_state_mismatch', path: ['state'] });
+    }
+    if ((safetyRouting || beforeSelection) && hasIntervention) {
+      ctx.addIssue({ code: 'custom', message: 'alcohol_recovery_intervention_not_allowed', path: ['interventionId'] });
+    }
+    if (
+      !safetyRouting &&
+      ['intervention_selected', 'intervention_active', 'completed'].includes(session.state) &&
+      (!hasId || !hasVersion)
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'alcohol_recovery_intervention_required', path: ['interventionId'] });
+    }
+    if ((safetyRouting || session.state === 'started') && session.reflection !== undefined) {
+      ctx.addIssue({ code: 'custom', message: 'alcohol_recovery_reflection_not_allowed', path: ['reflection'] });
+    }
+    if (
+      (safetyRouting || !hasIntervention || session.state === 'intervention_selected') &&
+      session.currentStepIndex !== 0
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'alcohol_recovery_step_not_allowed', path: ['currentStepIndex'] });
+    }
+  });
 
 export type AlcoholRecoveryNextAction = z.infer<typeof AlcoholRecoveryNextActionSchema>;
 export type AlcoholInterventionMode = z.infer<typeof AlcoholInterventionModeSchema>;

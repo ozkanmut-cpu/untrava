@@ -234,11 +234,57 @@ describe('AlcoholRecoveryEventSinkAdapter', () => {
     },
   );
 
+  it.each(['intervention_selected', 'intervention_active'] as const)(
+    'emits intervention facts after %s abandonment only if activated', async (state) => {
+      const { sink, store } = setup();
+      const recovery = start();
+      recovery.beginReflection(now);
+      recovery.recordReflection({ nextAction: 'review_plan' }, now);
+      recovery.selectReset(ALCOHOL_RESCUE_LIBRARY, now);
+      if (state === 'intervention_active') recovery.beginSelected(now);
+      const snapshot = recovery.abandon(later);
+      await sink.outcome(snapshot);
+      const events = await store.listPending(10);
+      expect(events).toHaveLength(1);
+      expect(events[0]?.payload).toEqual({
+        recoverySessionId: context().recoverySessionId, triggeringUseEventId: context().triggeringUseEventId,
+        goalId: context().goalId, outcome: 'abandoned', nextAction: 'review_plan',
+        ...(state === 'intervention_active' ? { interventionId: 'alcohol-recovery-reset', interventionVersion: 1 } : {}),
+      });
+      expect(AlcoholEventEnvelopeSchema.safeParse(events[0]).success).toBe(true);
+    },
+  );
+
   it.each(['started', 'reflecting', 'intervention_selected', 'intervention_active', 'safety_routing'] as const)(
     'does not infer an outcome from nonterminal %s', async (state) => {
       const { sink, store } = setup();
-      await expect(sink.outcome({ ...start().snapshot(), state })).rejects.toThrow('alcohol_recovery_outcome_requires_terminal_session');
+      const recovery = start(state === 'safety_routing' ? 'emergency_response' : undefined);
+      if (['reflecting', 'intervention_selected', 'intervention_active'].includes(state)) recovery.beginReflection(now);
+      if (['intervention_selected', 'intervention_active'].includes(state)) recovery.selectReset(ALCOHOL_RESCUE_LIBRARY, now);
+      if (state === 'intervention_active') recovery.beginSelected(now);
+      await expect(sink.outcome(recovery.snapshot())).rejects.toThrow('alcohol_recovery_outcome_requires_terminal_session');
       expect(await store.listPending(10)).toEqual([]);
+    },
+  );
+
+  it.each(['reflection', 'outcome'] as const)(
+    'rejects contradictory snapshots before %s append or identity/time allocation', async (method) => {
+      const { sink, store, createEventId, clock } = setup();
+      const completed = active().complete('finish', later);
+      const invalidSnapshots = [
+        { ...completed, interventionId: null },
+        { ...completed, interventionVersion: null },
+        { ...completed, interventionId: null, interventionVersion: null },
+        { ...completed, context: context('emergency_response') },
+        { ...completed, context: context('urgent_medical_assessment'), interventionId: null, interventionVersion: null },
+        { ...completed, state: 'started' as const },
+      ];
+      for (const snapshot of invalidSnapshots) {
+        await expect(sink[method](snapshot)).rejects.toThrow();
+      }
+      expect(await store.listPending(10)).toEqual([]);
+      expect(createEventId).not.toHaveBeenCalled();
+      expect(clock).not.toHaveBeenCalled();
     },
   );
 

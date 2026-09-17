@@ -381,6 +381,46 @@ describe('selectAlcoholIntervention fail-closed library handling', () => {
 });
 
 describe('selectAlcoholIntervention recovery mode', () => {
+  it.each([
+    undefined,
+    null,
+    {},
+    { disposition: 'emergency_response' },
+    { ...decision('behavior_change_support_allowed'), disposition: 'unknown' },
+    { ...decision('behavior_change_support_allowed'), ruleSetVersion: 0 },
+    { ...decision('urgent_medical_assessment'), ruleSetVersion: -1 },
+    { ...decision('emergency_response'), decidedAt: 'invalid' },
+  ])('fails closed on invalid runtime safety input %j before inspecting the library', (safety) => {
+    for (const candidate of [ALCOHOL_RESCUE_LIBRARY, {}]) {
+      expect(selectAlcoholIntervention(
+        candidate as AlcoholRescueLibrary, context, safety as WithdrawalSafetyDecision, 'micro', 'recovery',
+      )).toEqual({ kind: 'unavailable', reasonCodes: ['invalid_safety_decision'] });
+    }
+  });
+
+  it.each([
+    undefined,
+    null,
+    {},
+    { ...ALCOHOL_RESCUE_LIBRARY, interventions: null },
+    { ...ALCOHOL_RESCUE_LIBRARY, interventions: [null] },
+    { ...ALCOHOL_RESCUE_LIBRARY, interventions: [{}] },
+    { ...ALCOHOL_RESCUE_LIBRARY, contentVersion: 0 },
+    { ...ALCOHOL_RESCUE_LIBRARY, moduleId: 'tobacco' },
+  ])('returns library_unavailable for malformed runtime library %j', (candidate) => {
+    expect(selectAlcoholIntervention(
+      candidate as AlcoholRescueLibrary, context, decision('behavior_change_support_allowed'), 'micro', 'recovery',
+    )).toEqual({ kind: 'unavailable', reasonCodes: ['library_unavailable'] });
+  });
+
+  it.each(['emergency_response', 'urgent_medical_assessment'] as const)(
+    'routes valid %s before malformed runtime library validation', (disposition) => {
+      expect(selectAlcoholIntervention(
+        {} as AlcoholRescueLibrary, context, decision(disposition), 'micro', 'recovery',
+      )).toEqual({ kind: 'safety_routing', disposition, reasonCodes: [`safety:${disposition}`] });
+    },
+  );
+
   it.each([undefined, 'rescue'] as const)(
     'never selects the recovery reset in %s mode',
     (mode) => {

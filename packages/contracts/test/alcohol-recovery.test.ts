@@ -131,4 +131,75 @@ describe('alcohol recovery contracts', () => {
   it('rejects Tobacco goal values', () => {
     expect(schema('AlcoholRecoveryContextSchema').safeParse({ ...context, goalType: 'quit_nicotine' }).success).toBe(false);
   });
+
+  it.each([
+    { interventionId: null },
+    { interventionVersion: null },
+    ...(['intervention_selected', 'intervention_active', 'completed'] as const).map((state) => ({
+      state, interventionId: null, interventionVersion: null,
+    })),
+    ...(['started', 'reflecting'] as const).map((state) => ({ state, reflection: undefined })),
+    { state: 'started', interventionId: null, interventionVersion: null },
+    { state: 'safety_routing', interventionId: null, interventionVersion: null, reflection: undefined },
+    { state: 'reflecting', interventionId: null, interventionVersion: null, currentStepIndex: 1 },
+    { state: 'abandoned', interventionId: null, interventionVersion: null, currentStepIndex: 1 },
+    { state: 'intervention_selected', currentStepIndex: 1 },
+  ])('rejects contradictory behavioral snapshot fields %j', (fields) => {
+    expect(schema('AlcoholRecoverySessionSchema').safeParse({ ...completeSession, ...fields }).success).toBe(false);
+  });
+
+  it.each(['emergency_response', 'urgent_medical_assessment'] as const)(
+    'rejects behavioral states and content for pinned %s safety', (disposition) => {
+      const safetyOnly = {
+        ...completeSession,
+        context: { ...context, safetyDecision: { ...safetyDecision, disposition } },
+        interventionId: null,
+        interventionVersion: null,
+        reflection: undefined,
+      };
+      for (const state of ['started', 'reflecting', 'intervention_selected', 'intervention_active']) {
+        expect(schema('AlcoholRecoverySessionSchema').safeParse({ ...safetyOnly, state }).success, state).toBe(false);
+      }
+      for (const state of ['safety_routing', 'completed', 'abandoned']) {
+        for (const content of [
+          { reflection: {} },
+          { reflection: { nextAction: 'finish' } },
+          { interventionId: 'alcohol-recovery-reset', interventionVersion: 1 },
+          { currentStepIndex: 1 },
+        ]) {
+          expect(schema('AlcoholRecoverySessionSchema').safeParse({ ...safetyOnly, state, ...content }).success).toBe(false);
+        }
+      }
+    },
+  );
+
+  it.each(['behavior_change_support_allowed', 'medical_assessment_advised'] as const)(
+    'accepts every coherent behavioral snapshot for %s', (disposition) => {
+      const behavioral = {
+        ...completeSession,
+        context: { ...context, safetyDecision: { ...safetyDecision, disposition } },
+      };
+      for (const state of ['started', 'reflecting', 'abandoned']) {
+        expect(schema('AlcoholRecoverySessionSchema').safeParse({
+          ...behavioral, state, interventionId: null, interventionVersion: null,
+          reflection: state === 'started' ? undefined : behavioral.reflection,
+        }).success, state).toBe(true);
+      }
+      for (const state of ['intervention_selected', 'intervention_active', 'completed', 'abandoned']) {
+        expect(schema('AlcoholRecoverySessionSchema').safeParse({ ...behavioral, state }).success, state).toBe(true);
+      }
+    },
+  );
+
+  it.each(['emergency_response', 'urgent_medical_assessment'] as const)(
+    'accepts safety-only routing and terminal snapshots for %s', (disposition) => {
+      for (const state of ['safety_routing', 'completed', 'abandoned']) {
+        expect(schema('AlcoholRecoverySessionSchema').safeParse({
+          ...completeSession, state,
+          context: { ...context, safetyDecision: { ...safetyDecision, disposition } },
+          interventionId: null, interventionVersion: null, reflection: undefined,
+        }).success, state).toBe(true);
+      }
+    },
+  );
 });

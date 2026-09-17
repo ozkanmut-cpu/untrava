@@ -1,11 +1,13 @@
-import type {
-  AlcoholInterventionMode,
-  AlcoholInterventionDefinition,
-  AlcoholRescueContext,
-  AlcoholRescueLibrary,
-  InterventionActionKind,
-  InterventionLevel,
-  WithdrawalSafetyDecision,
+import {
+  AlcoholRescueLibrarySchema,
+  WithdrawalSafetyDecisionSchema,
+  type AlcoholInterventionMode,
+  type AlcoholInterventionDefinition,
+  type AlcoholRescueContext,
+  type AlcoholRescueLibrary,
+  type InterventionActionKind,
+  type InterventionLevel,
+  type WithdrawalSafetyDecision,
 } from '../../../../../packages/contracts/src/index';
 import { hasValidInterventionLibraryIntegrity } from '../../rescue/library-integrity';
 import { findMissingAlcoholRescueLocalizationKeys } from './localization';
@@ -150,6 +152,13 @@ export function selectAlcoholIntervention(
   minimumLevel: InterventionLevel = 'micro',
   mode: AlcoholInterventionMode = 'rescue',
 ): AlcoholRescueSelection {
+  if (!WithdrawalSafetyDecisionSchema.safeParse(safety).success) {
+    return {
+      kind: 'unavailable',
+      reasonCodes: ['invalid_safety_decision'],
+    };
+  }
+
   if (
     safety.disposition === 'emergency_response' ||
     safety.disposition === 'urgent_medical_assessment'
@@ -161,7 +170,11 @@ export function selectAlcoholIntervention(
     };
   }
 
-  if (!library || !hasValidInterventionLibraryIntegrity(library)) {
+  if (
+    !library ||
+    !AlcoholRescueLibrarySchema.safeParse(library).success ||
+    !hasValidInterventionLibraryIntegrity(library)
+  ) {
     return {
       kind: 'unavailable',
       reasonCodes: ['library_unavailable'],

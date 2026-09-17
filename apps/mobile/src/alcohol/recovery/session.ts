@@ -147,6 +147,14 @@ export class AlcoholRecoverySessionCoordinator {
 
   abandon(now: string): AlcoholRecoverySession {
     this.requireState('started', 'safety_routing', 'reflecting', 'intervention_selected', 'intervention_active');
-    return this.transition('abandoned', now);
+    return this.commit({
+      ...this.session,
+      state: 'abandoned',
+      // A selected reset becomes a used intervention only after activation.
+      ...(this.session.state === 'intervention_selected'
+        ? { interventionId: null, interventionVersion: null, currentStepIndex: 0 }
+        : {}),
+      updatedAt: now,
+    });
   }
 }
