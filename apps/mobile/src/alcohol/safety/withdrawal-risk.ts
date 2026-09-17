@@ -60,6 +60,20 @@ function unknownKeys(
   return keys.filter((key) => evidence[key].state === 'unknown');
 }
 
+function readCandidateState(candidate: unknown, key: WithdrawalEvidenceKey): unknown {
+  if (!candidate || typeof candidate !== 'object') return undefined;
+  const item = (candidate as Record<string, unknown>)[key];
+  if (!item || typeof item !== 'object') return undefined;
+  return (item as Record<string, unknown>).state;
+}
+
+function candidatePresentKeys(
+  candidate: unknown,
+  keys: readonly WithdrawalEvidenceKey[],
+): WithdrawalEvidenceKey[] {
+  return keys.filter((key) => readCandidateState(candidate, key) === 'present');
+}
+
 function decision(
   policy: WithdrawalRiskPolicy,
   disposition: WithdrawalSafetyDisposition,
@@ -85,9 +99,63 @@ export function evaluateWithdrawalRisk(
   decidedAt: string,
   policyCandidate: unknown = ALCOHOL_WITHDRAWAL_RISK_POLICY_V1,
 ): WithdrawalSafetyDecision {
-  const evidence = WithdrawalRiskEvidenceSchema.parse(evidenceCandidate);
+  const hardEvaluatedEvidenceKeys = orderedUnique([
+    ALCOHOL_WITHDRAWAL_RISK_POLICY_V1.emergencyEvidenceKeys,
+    ALCOHOL_WITHDRAWAL_RISK_POLICY_V1.urgentEvidenceKeys,
+  ]);
+
+  const hardEmergencyKeys = candidatePresentKeys(
+    evidenceCandidate,
+    ALCOHOL_WITHDRAWAL_RISK_POLICY_V1.emergencyEvidenceKeys,
+  );
+  if (hardEmergencyKeys.length > 0) {
+    return decision(
+      ALCOHOL_WITHDRAWAL_RISK_POLICY_V1,
+      'emergency_response',
+      hardEmergencyKeys.map((key) => reasonByEvidenceKey[key]),
+      hardEvaluatedEvidenceKeys,
+      [],
+      decidedAt,
+    );
+  }
+
+  const hardUrgentKeys = candidatePresentKeys(
+    evidenceCandidate,
+    ALCOHOL_WITHDRAWAL_RISK_POLICY_V1.urgentEvidenceKeys,
+  );
+  if (hardUrgentKeys.length > 0) {
+    return decision(
+      ALCOHOL_WITHDRAWAL_RISK_POLICY_V1,
+      'urgent_medical_assessment',
+      hardUrgentKeys.map((key) => reasonByEvidenceKey[key]),
+      hardEvaluatedEvidenceKeys,
+      [],
+      decidedAt,
+    );
+  }
+
+  const parsedEvidence = WithdrawalRiskEvidenceSchema.safeParse(evidenceCandidate);
+  if (!parsedEvidence.success) {
+    return decision(
+      ALCOHOL_WITHDRAWAL_RISK_POLICY_V1,
+      'medical_assessment_advised',
+      ['system.invalid_evidence'],
+      hardEvaluatedEvidenceKeys,
+      [],
+      decidedAt,
+    );
+  }
+  const evidence = parsedEvidence.data;
+
   if (!hasValidWithdrawalRiskPolicyIntegrity(policyCandidate)) {
-    throw new Error('Invalid alcohol withdrawal risk policy');
+    return decision(
+      ALCOHOL_WITHDRAWAL_RISK_POLICY_V1,
+      'medical_assessment_advised',
+      ['system.invalid_rule_set'],
+      hardEvaluatedEvidenceKeys,
+      [],
+      decidedAt,
+    );
   }
   const policy = policyCandidate;
   const evaluatedEvidenceKeys = orderedUnique([
