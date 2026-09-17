@@ -288,6 +288,34 @@ describe('selectAlcoholIntervention deterministic eligibility', () => {
     });
   });
 
+  it('requires exact-true audio capability', () => {
+    const candidate = library((value) => {
+      const micro = value.interventions.find(
+        (item) => item.interventionId === 'alcohol-micro-regulate',
+      );
+      if (!micro) throw new Error('missing bundled intervention');
+      micro.eligibility.requiresAudio = true;
+    });
+    const safety = decision('behavior_change_support_allowed');
+
+    expect(
+      selectAlcoholIntervention(candidate, context, safety),
+    ).toMatchObject({
+      kind: 'intervention',
+      interventionId: 'alcohol-urge-surf',
+    });
+    expect(
+      selectAlcoholIntervention(
+        candidate,
+        { ...context, canUseAudio: true },
+        safety,
+      ),
+    ).toMatchObject({
+      kind: 'intervention',
+      interventionId: 'alcohol-micro-regulate',
+    });
+  });
+
   it('uses stable ID ordering after level and burden ties', () => {
     const candidate = library((value) => {
       const micro = value.interventions.find(
