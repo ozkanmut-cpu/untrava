@@ -18,6 +18,7 @@ export type {
 export * from './alcohol/goals';
 export * from './alcohol/events';
 export * from './alcohol/safety';
+export * from './alcohol/rescue';
 export * from './profile';
 export * from './events';
 export * from './consent';
