@@ -5,6 +5,8 @@ import { WithdrawalSafetyDecisionSchema } from './safety';
 
 export const AlcoholPlanRelationSchema = z.enum(['planned', 'unplanned', 'unknown']);
 
+export const AlcoholInterventionModeSchema = z.enum(['rescue', 'recovery']);
+
 export const AlcoholRecoveryNextActionSchema = z.enum([
   'continue_goal',
   'open_rescue',
@@ -63,6 +65,7 @@ export const AlcoholRecoverySessionSchema = z
   .strict();
 
 export type AlcoholRecoveryNextAction = z.infer<typeof AlcoholRecoveryNextActionSchema>;
+export type AlcoholInterventionMode = z.infer<typeof AlcoholInterventionModeSchema>;
 export type AlcoholRecoveryReflection = z.infer<typeof AlcoholRecoveryReflectionSchema>;
 export type AlcoholRecoveryContext = z.infer<typeof AlcoholRecoveryContextSchema>;
 export type AlcoholRecoverySessionState = z.infer<typeof AlcoholRecoverySessionStateSchema>;

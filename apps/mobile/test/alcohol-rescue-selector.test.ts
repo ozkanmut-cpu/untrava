@@ -379,3 +379,149 @@ describe('selectAlcoholIntervention fail-closed library handling', () => {
     });
   });
 });
+
+describe('selectAlcoholIntervention recovery mode', () => {
+  it.each([undefined, 'rescue'] as const)(
+    'never selects the recovery reset in %s mode',
+    (mode) => {
+      const selected = selectAlcoholIntervention(
+        ALCOHOL_RESCUE_LIBRARY,
+        context,
+        decision('behavior_change_support_allowed'),
+        'micro',
+        mode,
+      );
+
+      expect(selected).toMatchObject({
+        kind: 'intervention',
+        interventionId: 'alcohol-micro-regulate',
+      });
+    },
+  );
+
+  it('selects only recovery-eligible content in recovery mode', () => {
+    expect(
+      selectAlcoholIntervention(
+        ALCOHOL_RESCUE_LIBRARY,
+        {
+          ...context,
+          preferredInterventionIds: ['alcohol-micro-regulate'],
+        },
+        decision('behavior_change_support_allowed'),
+        'micro',
+        'recovery',
+      ),
+    ).toEqual({
+      kind: 'intervention',
+      interventionId: 'alcohol-recovery-reset',
+      version: 1,
+      reasonCodes: ['lowest_burden_eligible', 'mode:recovery'],
+    });
+  });
+
+  it('returns no eligible intervention when recovery content is absent', () => {
+    const candidate = library((value) => {
+      value.interventions = value.interventions.filter(
+        (item) => item.recoveryEligible !== true,
+      );
+    });
+
+    expect(
+      selectAlcoholIntervention(
+        candidate,
+        context,
+        decision('behavior_change_support_allowed'),
+        'micro',
+        'recovery',
+      ),
+    ).toEqual({
+      kind: 'unavailable',
+      reasonCodes: ['no_eligible_intervention'],
+    });
+  });
+
+  it('fails closed when sealed recovery content has a missing localization key', () => {
+    const candidate = library((value) => {
+      const recovery = value.interventions.find(
+        (item) => item.interventionId === 'alcohol-recovery-reset',
+      );
+      if (!recovery) throw new Error('missing bundled recovery intervention');
+      recovery.titleKey = 'alcohol.recovery.reset.title.missing';
+    });
+
+    expect(
+      selectAlcoholIntervention(
+        candidate,
+        context,
+        decision('behavior_change_support_allowed'),
+        'micro',
+        'recovery',
+      ),
+    ).toEqual({
+      kind: 'unavailable',
+      reasonCodes: ['library_unavailable'],
+    });
+  });
+
+  it.each(['emergency_response', 'urgent_medical_assessment'] as const)(
+    'routes %s before corrupt-library handling in recovery mode',
+    (disposition) => {
+      const corrupt = {
+        ...ALCOHOL_RESCUE_LIBRARY,
+        contentHash: 'fnv1a32:v1:00000000',
+      };
+
+      expect(
+        selectAlcoholIntervention(
+          corrupt,
+          context,
+          decision(disposition),
+          'micro',
+          'recovery',
+        ),
+      ).toEqual({
+        kind: 'safety_routing',
+        disposition,
+        reasonCodes: [`safety:${disposition}`],
+      });
+    },
+  );
+
+  it('allows the safe recovery reset, but not delay or substitution, when medical assessment is advised', () => {
+    const candidate = library((value) => {
+      for (const item of value.interventions) {
+        if (
+          ![
+            'alcohol-recovery-reset',
+            'alcohol-delay',
+            'alcohol-substitution',
+          ].includes(item.interventionId)
+        ) {
+          item.status = 'retired';
+        }
+      }
+    });
+
+    expect(
+      selectAlcoholIntervention(
+        candidate,
+        {
+          ...context,
+          preferredInterventionIds: ['alcohol-delay', 'alcohol-substitution'],
+        },
+        decision('medical_assessment_advised'),
+        'micro',
+        'recovery',
+      ),
+    ).toEqual({
+      kind: 'intervention',
+      interventionId: 'alcohol-recovery-reset',
+      version: 1,
+      reasonCodes: [
+        'lowest_burden_eligible',
+        'safety:medical_assessment_advised',
+        'mode:recovery',
+      ],
+    });
+  });
+});

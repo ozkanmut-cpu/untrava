@@ -1,4 +1,5 @@
 import type {
+  AlcoholInterventionMode,
   AlcoholInterventionDefinition,
   AlcoholRescueContext,
   AlcoholRescueLibrary,
@@ -7,6 +8,7 @@ import type {
   WithdrawalSafetyDecision,
 } from '../../../../../packages/contracts/src/index';
 import { hasValidInterventionLibraryIntegrity } from '../../rescue/library-integrity';
+import { findMissingAlcoholRescueLocalizationKeys } from './localization';
 
 export type AlcoholRescueSelection =
   | {
@@ -51,9 +53,9 @@ function isEligible(
   item: AlcoholInterventionDefinition,
   context: AlcoholRescueContext,
   safety: WithdrawalSafetyDecision,
+  mode: AlcoholInterventionMode,
 ): boolean {
   if (item.status !== 'active') return false;
-  if (item.recoveryEligible) return false;
   if (context.disabledInterventionIds?.includes(item.interventionId)) return false;
   if (
     item.eligibility.allowedGoalTypes &&
@@ -79,8 +81,10 @@ function isEligible(
   }
   if (
     safety.disposition === 'medical_assessment_advised' &&
-    !item.steps.every((step) =>
-      MEDICAL_ASSESSMENT_SUPPORTIVE_ACTIONS.has(step.actionKind),
+    !item.steps.every(
+      (step) =>
+        MEDICAL_ASSESSMENT_SUPPORTIVE_ACTIONS.has(step.actionKind) ||
+        (mode === 'recovery' && step.actionKind === 'recovery'),
     )
   ) {
     return false;
@@ -144,6 +148,7 @@ export function selectAlcoholIntervention(
   context: AlcoholRescueContext,
   safety: WithdrawalSafetyDecision,
   minimumLevel: InterventionLevel = 'micro',
+  mode: AlcoholInterventionMode = 'rescue',
 ): AlcoholRescueSelection {
   if (
     safety.disposition === 'emergency_response' ||
@@ -163,11 +168,21 @@ export function selectAlcoholIntervention(
     };
   }
 
+  if (findMissingAlcoholRescueLocalizationKeys(library).length > 0) {
+    return {
+      kind: 'unavailable',
+      reasonCodes: ['library_unavailable'],
+    };
+  }
+
   const minimumRank = levelRank[minimumLevel];
   const candidates = library.interventions
     .filter(
       (item) =>
-        isEligible(item, context, safety) &&
+        (mode === 'recovery'
+          ? item.recoveryEligible === true
+          : item.recoveryEligible !== true) &&
+        isEligible(item, context, safety, mode) &&
         levelRank[item.level] >= minimumRank,
     )
     .sort((left, right) => compareCandidates(left, right, context));
@@ -189,6 +204,9 @@ export function selectAlcoholIntervention(
   }
   if (safety.disposition === 'medical_assessment_advised') {
     reasonCodes.push('safety:medical_assessment_advised');
+  }
+  if (mode === 'recovery') {
+    reasonCodes.push('mode:recovery');
   }
 
   return {
