@@ -48,6 +48,13 @@ describe('RescueLibrarySchema', () => {
     });
   });
 
+  it('preserves the legacy Tobacco Rescue library facade', () => {
+    const parsed = RescueLibrarySchema.parse(library([intervention()]));
+    expect(parsed.libraryId).toBe('untrava-rescue');
+    expect('moduleId' in parsed).toBe(false);
+    expect(RescueLibrarySchema.safeParse(library([intervention()], { libraryId: 'alcohol-rescue' })).success).toBe(false);
+  });
+
   it('requires schema version 1', () => {
     expect(RescueLibrarySchema.safeParse(library([intervention()], { schemaVersion: 2 })).success).toBe(false);
   });

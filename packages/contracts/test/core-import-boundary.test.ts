@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { InterventionLevelSchema } from '../src/index';
 
 declare global {
   interface ImportMeta {
@@ -36,6 +37,10 @@ const forbiddenCoreTokens = [
 ] as const;
 
 describe('Core import boundary', () => {
+  it('exports the generic intervention level contract', () => {
+    expect(InterventionLevelSchema.options).toEqual(['micro', 'guided', 'environment_escape', 'human_support']);
+  });
+
   it('keeps Tobacco and Alcohol imports and domain literals out of Core source', () => {
     const sources = import.meta.glob<string>('../src/core/*.ts', {
       eager: true,
