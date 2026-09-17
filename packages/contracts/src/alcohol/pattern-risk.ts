@@ -97,6 +97,46 @@ export const AlcoholPatternInsightSchema = z
   })
   .strict();
 
+export const AlcoholNearTermRiskTargetSchema = z.enum([
+  'unplanned_use',
+  'plan_exceedance',
+  'rescue_need',
+]);
+
+export const AlcoholNearTermRiskHorizonSchema = z.enum([
+  'next_24_hours',
+  'current_planning_day',
+]);
+
+export const AlcoholNearTermRiskBandSchema = z.enum([
+  'unknown',
+  'baseline',
+  'elevated',
+  'high',
+]);
+
+export const AlcoholNearTermRiskAssessmentSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    moduleId: z.literal('alcohol'),
+    assessmentId: z.string().min(1),
+    target: AlcoholNearTermRiskTargetSchema,
+    horizon: AlcoholNearTermRiskHorizonSchema,
+    riskBand: AlcoholNearTermRiskBandSchema,
+    contributingPatternIds: z.array(z.string().min(1)),
+    provenance: AlcoholDerivedEvidenceProvenanceSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (hasDuplicates(value.contributingPatternIds)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['contributingPatternIds'],
+        message: 'contributingPatternIds must be unique',
+      });
+    }
+  });
+
 export type AlcoholDerivedConfidence = z.infer<typeof AlcoholDerivedConfidenceSchema>;
 export type AlcoholDerivedMissingness = z.infer<typeof AlcoholDerivedMissingnessSchema>;
 export type AlcoholDerivedEvidenceProvenance = z.infer<typeof AlcoholDerivedEvidenceProvenanceSchema>;
@@ -104,3 +144,7 @@ export type AlcoholPatternInsightType = z.infer<typeof AlcoholPatternInsightType
 export type AlcoholPatternDirection = z.infer<typeof AlcoholPatternDirectionSchema>;
 export type AlcoholPatternStrength = z.infer<typeof AlcoholPatternStrengthSchema>;
 export type AlcoholPatternInsight = z.infer<typeof AlcoholPatternInsightSchema>;
+export type AlcoholNearTermRiskTarget = z.infer<typeof AlcoholNearTermRiskTargetSchema>;
+export type AlcoholNearTermRiskHorizon = z.infer<typeof AlcoholNearTermRiskHorizonSchema>;
+export type AlcoholNearTermRiskBand = z.infer<typeof AlcoholNearTermRiskBandSchema>;
+export type AlcoholNearTermRiskAssessment = z.infer<typeof AlcoholNearTermRiskAssessmentSchema>;
