@@ -138,3 +138,102 @@ describe('Alcohol Pattern/Risk contracts — pattern insight', () => {
     ).toThrow();
   });
 });
+
+const riskContracts = contracts as unknown as {
+  AlcoholNearTermRiskBandSchema?: { options: readonly string[] };
+  AlcoholNearTermRiskAssessmentSchema?: Schema;
+  WithdrawalSafetyDecisionSchema?: Schema;
+};
+
+const validRisk = {
+  schemaVersion: 1,
+  moduleId: 'alcohol',
+  assessmentId: 'risk-current-day-1',
+  target: 'plan_exceedance',
+  horizon: 'current_planning_day',
+  riskBand: 'elevated',
+  contributingPatternIds: ['pattern-friday-evening'],
+  provenance: validProvenance,
+} as const;
+
+describe('Alcohol Pattern/Risk contracts — near-term behavioral risk', () => {
+  it('exports and parses a valid near-term behavioral risk assessment', () => {
+    expect(riskContracts.AlcoholNearTermRiskAssessmentSchema).toBeDefined();
+    if (!riskContracts.AlcoholNearTermRiskAssessmentSchema) {
+      throw new Error('AlcoholNearTermRiskAssessmentSchema must be exported');
+    }
+
+    expect(riskContracts.AlcoholNearTermRiskAssessmentSchema.parse(validRisk)).toEqual(validRisk);
+  });
+
+  it('keeps unknown as an explicit risk band distinct from baseline', () => {
+    expect(riskContracts.AlcoholNearTermRiskBandSchema).toBeDefined();
+    if (!riskContracts.AlcoholNearTermRiskBandSchema) {
+      throw new Error('AlcoholNearTermRiskBandSchema must be exported');
+    }
+
+    expect(riskContracts.AlcoholNearTermRiskBandSchema.options).toEqual([
+      'unknown',
+      'baseline',
+      'elevated',
+      'high',
+    ]);
+
+    expect(riskContracts.AlcoholNearTermRiskAssessmentSchema).toBeDefined();
+    if (!riskContracts.AlcoholNearTermRiskAssessmentSchema) {
+      throw new Error('AlcoholNearTermRiskAssessmentSchema must be exported');
+    }
+
+    expect(
+      riskContracts.AlcoholNearTermRiskAssessmentSchema.parse({
+        ...validRisk,
+        riskBand: 'unknown',
+        contributingPatternIds: [],
+      }),
+    ).toBeDefined();
+  });
+
+  it('rejects duplicate contributing pattern ids', () => {
+    expect(riskContracts.AlcoholNearTermRiskAssessmentSchema).toBeDefined();
+    if (!riskContracts.AlcoholNearTermRiskAssessmentSchema) {
+      throw new Error('AlcoholNearTermRiskAssessmentSchema must be exported');
+    }
+
+    expect(() =>
+      riskContracts.AlcoholNearTermRiskAssessmentSchema?.parse({
+        ...validRisk,
+        contributingPatternIds: ['pattern-a', 'pattern-a'],
+      }),
+    ).toThrow();
+  });
+
+  it('rejects medical and withdrawal routing fields from behavioral risk', () => {
+    expect(riskContracts.AlcoholNearTermRiskAssessmentSchema).toBeDefined();
+    if (!riskContracts.AlcoholNearTermRiskAssessmentSchema) {
+      throw new Error('AlcoholNearTermRiskAssessmentSchema must be exported');
+    }
+
+    for (const [field, value] of [
+      ['withdrawalDisposition', 'behavior_change_support_allowed'],
+      ['medicalDisposition', 'medical_assessment_advised'],
+      ['detoxPermission', true],
+      ['withdrawalRisk', 'low'],
+      ['medicallyCleared', true],
+    ] as const) {
+      expect(() =>
+        riskContracts.AlcoholNearTermRiskAssessmentSchema?.parse({
+          ...validRisk,
+          [field]: value,
+        }),
+      ).toThrow();
+    }
+  });
+
+  it('keeps the existing WithdrawalSafetyDecision as a separate exported contract', () => {
+    expect(riskContracts.WithdrawalSafetyDecisionSchema).toBeDefined();
+    expect(riskContracts.AlcoholNearTermRiskAssessmentSchema).toBeDefined();
+    expect(riskContracts.WithdrawalSafetyDecisionSchema).not.toBe(
+      riskContracts.AlcoholNearTermRiskAssessmentSchema,
+    );
+  });
+});
